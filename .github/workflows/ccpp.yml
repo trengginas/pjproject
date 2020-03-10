@@ -10,4 +10,4 @@ jobs:
         echo "" >> pjlib/include/pj/config_site.h        
     - name: test ossl
       run:
-        dir C:\Program Files\Git\usr
+        dir "C:\Program Files\OpenSSL"
