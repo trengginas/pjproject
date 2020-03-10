@@ -23,7 +23,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: config site
-      run: cd pjlib\include\pj && cp config_site_test.h config_site.h
+      run: copy .\pjlib\include\pj\config_site_test.h .\pjlib\include\pj\config_site.h
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.0
       with:
