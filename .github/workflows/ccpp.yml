@@ -8,26 +8,6 @@ jobs:
     - name: config site
       run:
         echo "" >> pjlib/include/pj/config_site.h        
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.0
-      with:
-        vs-version: 14.0
-    - name: MSBuild
-      working-directory: .
-      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32
-
-  build-windows-default-full-bundle-1:
-  # full bundle: enable all codecs + AEC + DTLS
-  # full bundle 1: running pjlib, pjlib-util, pjmedia, and pjsua tests
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: config site
-      run: copy .\pjlib\include\pj\config_site_test.h .\pjlib\include\pj\config_site.h
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.0
-      with:
-        vs-version: 14.0
-    - name: MSBuild
-      working-directory: .
-      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32
+    - name: test ossl
+      run:
+        dir C:\Program Files\Git\usr
