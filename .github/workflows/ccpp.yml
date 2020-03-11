@@ -6,6 +6,19 @@ jobs:
     steps:
     - uses: ilammy/setup-nasm@v1 
     - name: get openssl
-      run: git clone --single-branch --branch OpenSSL_1_1_1-stable https://github.com/openssl/openssl.git
-    - name: configure openssl
-      run: cd openssl; perl Configure VC-WIN32 --prefix=c:\openssl-build
+      run: Invoke-WebRequest -Uri "https://bintray.com/vszakats/generic/download_file?file_path=openssl-1.1.1d-win32-mingw.zip" -OutFile ".\openssl.zip"
+    - name: expand openssl
+      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\
+    - uses: actions/checkout@master    
+    - name: config site
+      run:
+        echo "#define PJ_HAS_SSL_SOCK 1" >> pjlib/include/pj/config_site.h        
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.0
+      with:
+        vs-version: 14.0
+    - name: set environment var
+      run: $env:INCLUDE += ";.\openssl_build\openssl-1.1.1d-win32-mingw\include";$env:LIB += ";.\openssl_build\openssl-1.1.1d-win32-mingw\lib"
+    - name: MSBuild
+      working-directory: .
+      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32      
