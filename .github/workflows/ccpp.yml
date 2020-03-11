@@ -4,11 +4,12 @@ jobs:
   build-windows-default:
     runs-on: windows-latest
     steps:
-    - uses: ilammy/setup-nasm@v1 
     - name: get openssl
       run: Invoke-WebRequest -Uri "https://bintray.com/vszakats/generic/download_file?file_path=openssl-1.1.1d-win32-mingw.zip" -OutFile ".\openssl.zip"
     - name: expand openssl
       run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\
+    - name: test zip
+      run: dir .\openssl_build
     - uses: actions/checkout@master    
     - name: config site
       run:
@@ -21,4 +22,4 @@ jobs:
       run: $env:INCLUDE += ";.\openssl_build\openssl-1.1.1d-win32-mingw\include";$env:LIB += ";.\openssl_build\openssl-1.1.1d-win32-mingw\lib"
     - name: MSBuild
       working-directory: .
-      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32      
+      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:useenv=true    
