@@ -4,10 +4,8 @@ jobs:
   build-windows-default:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@master    
-    - name: config site
-      run:
-        echo "" >> pjlib/include/pj/config_site.h        
-    - name: test ossl
-      run:
-        dir "C:\Program Files\OpenSSL"
+    - uses: ilammy/setup-nasm@v1 
+    - name: get openssl
+      run: git clone --single-branch --branch OpenSSL_1_1_1-stable https://github.com/openssl/openssl.git
+    - name: configure openssl
+      run: perl Configure VC-WIN32 --prefix=c:\openssl-build
