@@ -20,13 +20,13 @@ jobs:
       uses: microsoft/setup-msbuild@v1.0.0
       with:
         vs-version: 14.0
-    - name: check vcvars32.bat
-      run: dir "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\vcvars32.bat"
+    - name: check VsDevCmd.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat"
       shell: cmd
     - name: MSBuild
       working-directory: .
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\vcvars32.bat"
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat"
         set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
         set LIB=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
         echo on
