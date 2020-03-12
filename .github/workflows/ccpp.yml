@@ -19,7 +19,7 @@ jobs:
       with:
         vs-version: 14.0
     - name: set environment var
-      run: $env:INCLUDE += ";.\openssl_build\openssl-1.1\x86\include";$env:LIB += ";.\openssl_build\openssl-1.1\x86\lib"
+      run: $env:INCLUDE += ";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include";$env:LIB += ";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
     - name: print INCLUDE
       run: $env:INCLUDE
     - name: print LIB
