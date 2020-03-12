@@ -21,18 +21,14 @@ jobs:
       with:
         vs-version: 14.0
     - name: set environment var
-      run: set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include\
-      shell: cmd
-    - name: set LIB var
-      run: set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib\
-      shell: cmd
-    - name: print INCLUDE
-      run: echo on echo %INCLUDE%
-      shell: cmd
-    - name: print LIB
-      run: echo on echo %LIB%
-      shell: cmd
+      env: 
+        FOLDER_OSSL: D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\
+        INCLUDE_OSSL: $FOLDER_OSSL\include
+        LIB_OSSL: $FOLDER_OSSL\lib
     - name: MSBuild
       working-directory: .
-      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32
+      run: |
+        set INCLUDE=%INCLUDE%;$INCLUDE_OSSL
+        set LIB=%INCLUDE%;$LIB_OSSL
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32
       shell: cmd
