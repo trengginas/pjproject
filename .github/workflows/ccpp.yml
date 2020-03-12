@@ -27,8 +27,8 @@ jobs:
         INCLUDE_OSSL: $FOLDER_OSSL\include
         LIB_OSSL: $FOLDER_OSSL\lib
       run: |
-        set INCLUDE=%INCLUDE%;$INCLUDE_OSSL
-        set LIB=%INCLUDE%;$LIB_OSSL
+        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
+        set LIB=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
         echo on
         echo %INCLUDE%
         echo %LIB%
