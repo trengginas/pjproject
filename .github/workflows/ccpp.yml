@@ -8,8 +8,10 @@ jobs:
       run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
     - name: expand openssl
       run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\
-    - name: test zip
-      run: dir .\openssl_build
+    - name: check openssl folder
+      run: |
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
       shell: powershell
     - uses: actions/checkout@master    
     - name: config site
