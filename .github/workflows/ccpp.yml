@@ -20,12 +20,11 @@ jobs:
       uses: microsoft/setup-msbuild@v1.0.0
       with:
         vs-version: 14.0
+    - name: check vcvars32.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\vcvars32.bat"
+      shell: cmd
     - name: MSBuild
       working-directory: .
-      env: 
-        FOLDER_OSSL: D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\
-        INCLUDE_OSSL: $FOLDER_OSSL\include
-        LIB_OSSL: $FOLDER_OSSL\lib
       run: |
         "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\vcvars32.bat"
         set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
