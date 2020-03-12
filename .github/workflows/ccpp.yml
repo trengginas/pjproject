@@ -20,10 +20,14 @@ jobs:
         vs-version: 14.0
     - name: set environment var
       run: $env:INCLUDE += ";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include";$env:LIB += ";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
+      shell: powershell
     - name: print INCLUDE
       run: $env:INCLUDE
+      shell: powershell
     - name: print LIB
       run: $env:LIB
+      shell: powershell
     - name: MSBuild
       working-directory: .
       run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:WindowsTargetPlatformVersion=10.0.18362.0 /p:UseEnv=true
+      shell: powershell
