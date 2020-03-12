@@ -21,12 +21,12 @@ jobs:
       with:
         vs-version: 14.0
     - name: check VsDevCmd.bat
-      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat"
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
     - name: MSBuild
       working-directory: .
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat"
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Enterprise\Tools\VsDevCmd.bat"
         set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
         set LIB=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
         echo on
