@@ -29,12 +29,14 @@ jobs:
       working-directory: .
       run: |
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        dir D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
+        dir D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
         set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
         set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
         echo on
         echo "=======INCLUDE FOLDER====="
         echo %INCLUDE%
         echo "=======LIB FOLDER====="
-        echo %LIB%
+        echo %LIB%      
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:UseEnv=true
       shell: cmd
