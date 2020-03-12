@@ -32,5 +32,5 @@ jobs:
         echo on
         echo %INCLUDE%
         echo %LIB%
-        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:UseEnv=true
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:WindowsTargetPlatformVersion=10.1.18362.1 /p:Platform=win32 /p:UseEnv=true
       shell: cmd
