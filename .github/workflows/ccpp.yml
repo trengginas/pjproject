@@ -16,4 +16,4 @@ jobs:
       working-directory: .
       run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32
     - name: unit tests
-      run: pjlib/bin/pjlib-test-i386-Win32-vc14-Debug.exe;pjlib-util/bin/pjlib-util-test-i386-Win32-vc14-Debug.exe;pjmedia/bin/pjmedia-test-i386-Win32-vc14-Debug.exe;pjnath/bin/pjnath-test-i386-Win32-vc14-Debug.exe
+      run: pjlib/bin/pjlib-test-i386-Win32-vc14-Debug.exe;pjlib-util/bin/pjlib-util-test-i386-Win32-vc14-Debug.exe;pjmedia/bin/pjmedia-test-i386-Win32-vc14-Debug.exe
