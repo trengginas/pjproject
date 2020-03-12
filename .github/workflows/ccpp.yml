@@ -26,7 +26,7 @@ jobs:
     - name: MSBuild
       working-directory: .
       run: |
-        "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\vcvars32.bat"
+        call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\vcvars32.bat"
         set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
         set LIB=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
         echo on
