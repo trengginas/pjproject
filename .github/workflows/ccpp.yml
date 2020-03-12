@@ -10,24 +10,29 @@ jobs:
       run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\
     - name: test zip
       run: dir .\openssl_build
+      shell: powershell
     - uses: actions/checkout@master    
     - name: config site
       run:
         cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
+      shell: powershell
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.0
       with:
         vs-version: 14.0
     - name: set environment var
-      run: $env:INCLUDE += ";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include";$env:LIB += ";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
-      shell: powershell
+      run: set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include\
+      shell: cmd
+    - name: set LIB var
+      run: set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib\
+      shell: cmd
     - name: print INCLUDE
-      run: echo ${env:INCLUDE}
-      shell: powershell
+      run: echo %INCLUDE%
+      shell: cmd
     - name: print LIB
-      run: echo ${env:LIB}
-      shell: powershell
+      run: echo %LIB%
+      shell: cmd
     - name: MSBuild
       working-directory: .
-      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:WindowsTargetPlatformVersion=10.0.18362.0 /p:UseEnv=true
-      shell: powershell
+      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:UseEnv=true
+      shell: cmd
