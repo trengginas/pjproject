@@ -34,5 +34,5 @@ jobs:
       shell: cmd
     - name: MSBuild
       working-directory: .
-      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:UseEnv=true
+      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32
       shell: cmd
