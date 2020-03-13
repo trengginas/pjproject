@@ -38,5 +38,9 @@ jobs:
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
-      run: $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin";pjlib/bin/pjlib-test-i386-Win32-vc14-Debug.exe;pjlib-util/bin/pjlib-util-test-i386-Win32-vc14-Debug.exe;pjmedia/bin/pjmedia-test-i386-Win32-vc14-Debug.exe
+      run: |
+        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
+        cd pjlib/bin; pjlib-test-i386-Win32-vc14-Debug.exe
+        cd pjlib-util/bin; pjlib-util-test-i386-Win32-vc14-Debug.exe
+        cd pjmedia/bin/; pjmedia-test-i386-Win32-vc14-Debug.exe
       shell: powershell
