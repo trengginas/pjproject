@@ -5,6 +5,23 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@master
+    - name: set config site
+      run:
+        echo "" > pjlib/include/pj/config_site.h
+      shell: powershell
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.0
+      with:
+        vs-version: 14.0
+    - name: MSBuild
+      working-directory: .
+      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32
+      shell: cmd
+      
+  build-windows-default-full-bundle-1:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@master
     - name: get openssl
       run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
       shell: powershell
@@ -20,10 +37,6 @@ jobs:
       run:
         cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
       shell: powershell
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.0
-      with:
-        vs-version: 14.0
     - name: check VsDevCmd.bat
       run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
@@ -35,12 +48,12 @@ jobs:
         dir D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
         set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
         set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
-        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Debug /p:Platform=win32 /p:UseEnv=true
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
       run: |
         $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
         cd pjlib/bin; ./pjlib-test-i386-Win32-vc14-Debug.exe
-        cd ../../pjlib-util/bin; ./pjlib-util-test-i386-Win32-vc14-Debug.exe
-        cd ../../pjmedia/bin/; ./pjmedia-test-i386-Win32-vc14-Debug.exe
+        cd ../../pjlib-util/bin; ./pjlib-util-test-i386-Win32-vc14-Release.exe
+        cd ../../pjmedia/bin/; ./pjmedia-test-i386-Win32-vc14-Release.exe
       shell: powershell
