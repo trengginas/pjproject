@@ -244,7 +244,7 @@ jobs:
         dir "D:\a\pjproject\pjproject\libffmpeg_build\include"
         dir "D:\a\pjproject\pjproject\libffmpeg_build\lib\x86"
       shell: powershell
-    - name: get x264
+    - name: get libx264
       run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/x264/releases/download/0.159.r2991/libx264_0.159.r2991_msvc14.zip" -Outfile ".\libx264.zip"
       shell: powershell
     - name: expand libx264
