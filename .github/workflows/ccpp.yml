@@ -268,7 +268,7 @@ jobs:
       shell: powershell
     - name: config site
       run: |
-        echo "" > config_site.h        
+        echo "" > pjlib\include\pj\config_site.h        
         Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 1"
         Add-Content config_site.h "#define PJMEDIA_HAS_FFMPEG 1"
         Add-Content config_site.h "#define PJMEDIA_HAS_FFMPEG_VID_CODEC 1"
