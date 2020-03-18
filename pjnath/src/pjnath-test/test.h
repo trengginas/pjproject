@@ -21,11 +21,11 @@
 #include <pjlib-util.h>
 #include <pjnath.h>
 
-#define INCLUDE_STUN_TEST	    1
+#define INCLUDE_STUN_TEST	    0
 #define INCLUDE_ICE_TEST	    1
-#define INCLUDE_STUN_SOCK_TEST	    1
-#define INCLUDE_TURN_SOCK_TEST	    1
-#define INCLUDE_CONCUR_TEST    	    1
+#define INCLUDE_STUN_SOCK_TEST	    0
+#define INCLUDE_TURN_SOCK_TEST	    0
+#define INCLUDE_CONCUR_TEST    	    0
 
 #define GET_AF(use_ipv6) (use_ipv6?pj_AF_INET6():pj_AF_INET())
 

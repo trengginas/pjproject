@@ -876,18 +876,18 @@ int ice_test(void)
     } sess_cfg[] =
     {
 	/*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
-	{
-	    "hosts candidates only",
-	    0x1FFF,
-	    {ROLE1, 1,	    YES,    NO,	    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
-	    {ROLE2, 1,	    YES,    NO,	    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
-	},
-	{
-	    "host and srflxes",
-	    0x1FFF,
-	    {ROLE1, 1,	    YES,    YES,    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
-	    {ROLE2, 1,	    YES,    YES,    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
-	},
+	//{
+	//    "hosts candidates only",
+	//    0x1FFF,
+	//    {ROLE1, 1,	    YES,    NO,	    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
+	//    {ROLE2, 1,	    YES,    NO,	    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
+	//},
+	//{
+	//    "host and srflxes",
+	//    0x1FFF,
+	//    {ROLE1, 1,	    YES,    YES,    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
+	//    {ROLE2, 1,	    YES,    YES,    NO,	    NO,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
+	//},
 	{
 	    "host vs relay",
 	    0x1FFF,
