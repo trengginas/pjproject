@@ -53,7 +53,7 @@ jobs:
     - name: unit tests
       run: |
         $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
-        cd pjlib/bin; ./pjlib-test-i386-Win32-vc14-Debug.exe
+        cd pjlib/bin; ./pjlib-test-i386-Win32-vc14-Release.exe
         cd ../../pjlib-util/bin; ./pjlib-util-test-i386-Win32-vc14-Release.exe
         cd ../../pjmedia/bin/; ./pjmedia-test-i386-Win32-vc14-Release.exe
       shell: powershell
