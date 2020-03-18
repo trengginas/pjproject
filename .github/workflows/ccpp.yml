@@ -1,370 +1,289 @@
-name: C/C++ CI
-
-on: [push, pull_request]
-
+name: BUILD WIN
+on: [push]
 jobs:
-  build-ubuntu-default:
-  # checking pure lib source distribution with plain configure & make
-    runs-on: ubuntu-latest
+  build-windows-default:
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
+    - uses: actions/checkout@master
+    - name: set config site
+      run:
+        echo "" > pjlib/include/pj/config_site.h
+      shell: powershell
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.0
+      with:
+        vs-version: 14.0
+    - name: MSBuild
+      working-directory: .
+      run: msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32
+      shell: cmd
 
-  build-ubuntu-default-full-bundle-1:
-  # full bundle: enable all codecs + AEC + DTLS
-  # full bundle 1: running pjlib, pjlib-util, pjmedia, and pjsua tests
-    runs-on: ubuntu-latest
+  build-windows-default-full-bundle-1:
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y swig sip-tester libopencore-amrnb-dev
+    - uses: actions/checkout@master
+    - name: get openssl
+      run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
+      shell: powershell
+    - name: expand openssl
+      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+      shell: powershell
+    - name: check openssl folder
+      run: |
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
+      shell: powershell    
     - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
-    - name: configure
-      run: CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
+      run:
+        cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
+      shell: powershell
+    - name: check VsDevCmd.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      shell: cmd
+    - name: MSBuild
+      working-directory: .
+      run: |
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        dir D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
+        dir D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
+        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
+        set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+      shell: cmd
     - name: unit tests
-      run: make pjlib-test pjlib-util-test pjmedia-test pjsua-test
-
-  build-ubuntu-default-full-bundle-2:
-  # full bundle 2: running pjnath test
-    runs-on: ubuntu-latest
+      run: |
+        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
+        cd pjlib/bin; ./pjlib-test-i386-Win32-vc14-Release.exe
+        cd ../../pjlib-util/bin; ./pjlib-util-test-i386-Win32-vc14-Release.exe
+        cd ../../pjmedia/bin/; ./pjmedia-test-i386-Win32-vc14-Release.exe
+      shell: powershell
+      
+  build-windows-default-full-bundle-2:
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y libopencore-amrnb-dev
+    - uses: actions/checkout@master
+    - name: get openssl
+      run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
+      shell: powershell
+    - name: expand openssl
+      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+      shell: powershell
+    - name: check openssl folder
+      run: |
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
+      shell: powershell    
     - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
+      run:
+        cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
+      shell: powershell
+    - name: check VsDevCmd.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      shell: cmd
+    - name: MSBuild
+      working-directory: .
+      run: |
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
+        set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+      shell: cmd
     - name: unit tests
-      run: make pjnath-test
+      run: |
+        NetSh Advfirewall set allprofiles state off
+        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
+        cd pjnath/bin; ./pjnath-test-i386-Win32-vc14-Release.exe
+      shell: powershell
 
-  build-ubuntu-default-full-bundle-3:
-  # full bundle 3: running pjsip test
-    runs-on: ubuntu-latest
+  build-windows-default-full-bundle-3:
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y libopencore-amrnb-dev
+    - uses: actions/checkout@master
+    - name: get openssl
+      run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
+      shell: powershell
+    - name: expand openssl
+      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+      shell: powershell
+    - name: check openssl folder
+      run: |
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
+      shell: powershell    
     - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
+      run:
+        cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
+      shell: powershell
+    - name: check VsDevCmd.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      shell: cmd
+    - name: MSBuild
+      working-directory: .
+      run: |
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
+        set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+      shell: cmd
     - name: unit tests
-      run: make pjsip-test
+      run: |
+        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
+        cd pjsip/bin; ./pjsip-test-i386-Win32-vc14-Release.exe
+      shell: powershell
 
-  build-ubuntu-no-tls:
-  # no TLS
-    runs-on: ubuntu-latest
+  build-windows-gnu-tls:
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y swig
-    - name: configure
-      run: CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --disable-ssl
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-
-  # build-ubuntu-openssl
-  # TLS: with OpenSSL (same as build-ubuntu-default)
-
-  build-ubuntu-gnu-tls:
-  # TLS: with GnuTLS
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get update && sudo apt-get install -y --fix-missing swig libgnutls28-dev
-    - name: configure
-      run: CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --with-gnutls=/usr/
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-
-  build-ubuntu-video-openh264-1:
-  # video: video enabled with vpx and openh264
-  # video 1: running pjlib, pjlib-util, pjmedia, and pjsua tests
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y swig nasm sip-tester libvpx-dev libopencore-amrnb-dev
-    - name: get openh264
-      run: git clone --single-branch --branch openh264v2.1.0 https://github.com/cisco/openh264.git
-    - name: build openh264
-      run: cd openh264 && make && sudo make install && sudo ldconfig
+    - uses: actions/checkout@master
+    - name: get gnutls
+      run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/gnutls/releases/download/gnutls_3_6_11/libgnutls_gnutls_3_6_11_msvc14.zip" -Outfile ".\libgnutls.zip"      
+      shell: powershell
+    - name: expand gnutls
+      run: Expand-Archive -LiteralPath .\libgnutls.zip -DestinationPath .\libgnutls_build\; pwd
+      shell: powershell
+    - name: check gnutls folder
+      run: |
+        dir "D:\a\pjproject\pjproject\libgnutls_build\include"
+        dir "D:\a\pjproject\pjproject\libgnutls_build\lib\x86"
+      shell: powershell    
     - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h && echo "#define PJMEDIA_HAS_VIDEO 1" >> config_site.h
-    - name: configure
-      run: CFLAGS="-fPIC -DHAS_VID_CODEC_TEST=0" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-    - name: unit tests
-      run: make pjlib-test pjlib-util-test pjmedia-test pjsua-test
+      run: |
+        echo "" > pjlib\include\pj\config_site.h
+        Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
+        Add-Content config_site.h "#define PJ_SSL_SOCK_IMP PJ_SSL_SOCK_IMP_GNUTLS"
+      shell: powershell
+    - name: check VsDevCmd.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      shell: cmd
+    - name: MSBuild
+      working-directory: .
+      run: |
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\libgnutls_build\include
+        set LIB=%LIB%;D:\a\pjproject\pjproject\libgnutls_build\lib\x86
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+      shell: cmd
 
-  build-ubuntu-video-openh264-2:
-  # video 2: running pjnath test
-    runs-on: ubuntu-latest
+  build-windows-video-libvpx:
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y nasm libvpx-dev libopencore-amrnb-dev
-    - name: get openh264
-      run: git clone --single-branch --branch openh264v2.1.0 https://github.com/cisco/openh264.git
-    - name: build openh264
-      run: cd openh264 && make && sudo make install && sudo ldconfig
+    - uses: actions/checkout@master
+    - name: get openssl
+      run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
+      shell: powershell
+    - name: expand openssl
+      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+      shell: powershell
+    - name: check openssl folder
+      run: |
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
+        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
+      shell: powershell      
+    - name: get libvpx
+      run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/libvpx/releases/download/v1.8.2/libvpx_v1.8.2_msvc14.zip" -Outfile "libvpx.zip"
+      shell: powershell
+    - name: expand libvpx
+      run: Expand-Archive -LiteralPath .\libvpx.zip -DestinationPath .\libvpx_build\; pwd
+      shell: powershell      
+    - name: check libvpx folder
+      run: |
+        dir "D:\a\pjproject\pjproject\libvpx_build\include"
+        dir "D:\a\pjproject\pjproject\libvpx_build\lib\x86"
+      shell: powershell
+    - name: get libsdl
+      run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/SDL/releases/download/release-2.0.9/libsdl_release-2.0.9_msvc14.zip" -Outfile ".\libsdl.zip"
+      shell: powershell
+    - name: expand libsdl
+      run: Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\; pwd
+      shell: powershell      
+    - name: check libsdl folder
+      run: |
+        dir "D:\a\pjproject\pjproject\libsdl_build\include\SDL"
+        dir "D:\a\pjproject\pjproject\libsdl_build\lib\x86"
+      shell: powershell      
     - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h && echo "#define PJMEDIA_HAS_VIDEO 1" >> config_site.h
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
+      run: |
+        cd pjlib/include/pj; cp config_site_test.h config_site.h
+        Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
+        Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 1"
+        Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_DSHOW 1"
+        Add-Content config_site.h "#define PJMEDIA_HAS_LIBYUV 1"
+        Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 1"
+        Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 1"
+      shell: powershell
+    - name: check VsDevCmd.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      shell: cmd
+    - name: MSBuild
+      working-directory: .
+      run: |
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include;D:\a\pjproject\pjproject\libsdl_build\include\SDL;D:\a\pjproject\pjproject\libvpx_build\include
+        set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib;D:\a\pjproject\pjproject\libvpx_build\lib\x86;D:\a\pjproject\pjproject\libsdl_build\lib\x86
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+      shell: cmd
     - name: unit tests
-      run: make pjnath-test
+      run: |
+        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin;D:\a\pjproject\pjproject\libvpx_build\bin\x86;D:\a\pjproject\pjproject\libsdl_build\bin\x86;"
+        cd pjlib/bin; ./pjlib-test-i386-Win32-vc14-Release.exe
+        cd ../../pjlib-util/bin; ./pjlib-util-test-i386-Win32-vc14-Release.exe
+        cd ../../pjmedia/bin/; ./pjmedia-test-i386-Win32-vc14-Release.exe
+      shell: powershell      
 
-  build-ubuntu-video-openh264-3:
-  # video: 3: running pjsip test
-    runs-on: ubuntu-latest
+  build-windows-video-ffmpeg:
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y nasm libvpx-dev libopencore-amrnb-dev
-    - name: get openh264
-      run: git clone --single-branch --branch openh264v2.1.0 https://github.com/cisco/openh264.git
-    - name: build openh264
-      run: cd openh264 && make && sudo make install && sudo ldconfig
-    - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h && echo "#define PJMEDIA_HAS_VIDEO 1" >> config_site.h
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
-    - name: unit tests
-      run: make pjsip-test
-
-  build-ubuntu-video-ffmpeg:
-  # video enabled with vpx and ffmpeg and x264
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: sudo apt-get install -y swig nasm libx264-dev libvpx-dev
+    - uses: actions/checkout@master
     - name: get ffmpeg
-      run: git clone --single-branch --branch release/4.2 https://github.com/FFmpeg/FFmpeg.git
-    - name: configure ffmpeg
-      run: cd FFmpeg && ./configure --enable-shared --disable-static --enable-gpl --enable-libx264
-    - name: build ffmpeg
-      run: cd FFmpeg && make -j10 && sudo make install
+      run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/FFmpeg/releases/download/4.3.r96746/libffmpeg_4.3.r96746_msvc14_x86.zip" -Outfile "libffmpeg.zip"
+      shell: powershell
+    - name: expand ffmpeg
+      run: Expand-Archive -LiteralPath .\libffmpeg.zip -DestinationPath .\libffmpeg_build\; pwd
+      shell: powershell      
+    - name: check ffmpeg folder
+      run: |
+        dir "D:\a\pjproject\pjproject\libffmpeg_build\include"
+        dir "D:\a\pjproject\pjproject\libffmpeg_build\lib\x86"
+      shell: powershell
+    - name: get libx264
+      run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/x264/releases/download/0.159.r2991/libx264_0.159.r2991_msvc14.zip" -Outfile ".\libx264.zip"
+      shell: powershell
+    - name: expand libx264
+      run: Expand-Archive -LiteralPath .\libx264.zip -DestinationPath .\libx264_build\; pwd
+      shell: powershell      
+    - name: check ffmpeg folder
+      run: |
+        dir "D:\a\pjproject\pjproject\libx264_build\include"
+        dir "D:\a\pjproject\pjproject\libx264_build\lib\x86"
+      shell: powershell      
+    - name: get libsdl
+      run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/SDL/releases/download/release-2.0.9/libsdl_release-2.0.9_msvc14.zip" -Outfile ".\libsdl.zip"
+      shell: powershell
+    - name: expand libsdl
+      run: Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\; pwd
+      shell: powershell      
+    - name: check libsdl folder
+      run: |
+        dir "D:\a\pjproject\pjproject\libsdl_build\include\SDL"
+        dir "D:\a\pjproject\pjproject\libsdl_build\lib\x86"
+      shell: powershell
     - name: config site
-      run: echo -e "#define PJMEDIA_HAS_VIDEO 1\n" > pjlib/include/pj/config_site.h
-    - name: configure
-      run: CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-
-  build-mac-default:
-  # checking pure lib source distribution with plain configure & make
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
-
-  build-mac-default-full-bundle-1:
-  # full bundle: enable all codecs + AEC + DTLS
-  # full bundle 1: running pjlib, pjlib-util, pjmedia, and pjsua tests
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install opencore-amr
-    - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include -fPIC" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-    - name: disable firewall
-      run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
-    - name: unit tests
-      run: make pjlib-test pjmedia-test pjlib-util-test pjsua-test
-
-  build-mac-default-full-bundle-2:
-  # full bundle 2: running pjnath test
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install opencore-amr
-    - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" ./configure
-    - name: make
-      run: make
-    - name: disable firewall
-      run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
-    - name: unit tests
-      run: make pjnath-test
-
-  build-mac-default-full-bundle-3:
-  # full bundle 3: running pjsip test
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install opencore-amr
-    - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" ./configure
-    - name: make
-      run: make
-    - name: disable firewall
-      run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
-    - name: unit tests
-      run: make pjsip-test
-
-  # build-ubuntu-no-tls:
-  # no TLS (same as build-mac-default)
-
-  build-mac-openssl:
-  # TLS: with OpenSSL
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include -fPIC" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-
-  build-mac-gnu-tls:
-  # TLS: with GnuTLS
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: configure
-      run: CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --with-gnutls=/usr/local/
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-
-  build-mac-video-openh264-1:
-  # video: video enabled with vpx and openh264
-  # video 1: running pjlib, pjlib-util, pjmedia, and pjsua tests
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install openh264 libvpx opencore-amr sipp 
-    - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h && echo "#define PJMEDIA_HAS_VIDEO 1" >> config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include -DHAS_VID_CODEC_TEST=0 -fPIC" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-    - name: disable firewall
-      run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
-    - name: unit tests
-      run: make pjlib-test pjmedia-test pjlib-util-test pjsua-test
-
-  build-mac-video-openh264-2:
-  # video 2: running pjnath test
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install openh264 libvpx opencore-amr
-    - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h && echo "#define PJMEDIA_HAS_VIDEO 1" >> config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" ./configure
-    - name: make
-      run: make
-    - name: disable firewall
-      run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
-    - name: unit tests
-      run: make pjnath-test
-
-  build-mac-video-openh264-3:
-  # video 3: running pjsip test
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install openh264 libvpx opencore-amr
-    - name: config site
-      run: cd pjlib/include/pj && cp config_site_test.h config_site.h && echo "#define PJMEDIA_HAS_VIDEO 1" >> config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" ./configure
-    - name: make
-      run: make
-    - name: disable firewall
-      run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
-    - name: unit tests
-      run: make pjsip-test
-
-  build-mac-video-ffmpeg:
-  # video enabled with vpx and ffmpeg and x264
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install x264 libvpx nasm
-    - name: get ffmpeg
-      run: git clone --single-branch --branch release/4.2 https://github.com/FFmpeg/FFmpeg.git
-    - name: configure ffmpeg
-      run: cd FFmpeg && ./configure --enable-shared --disable-static --enable-gpl --enable-libx264
-    - name: build ffmpeg
-      run: cd FFmpeg && make -j10 && sudo make install
-    - name: config site
-      run: echo -e "#define PJMEDIA_HAS_VIDEO 1\n" > pjlib/include/pj/config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include -fPIC" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
-
-  build-mac-video-vid-toolbox:
-  # video enabled with vpx and video toolbox
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: brew install libvpx
-    - name: config site
-      run: echo -e "#define PJMEDIA_HAS_VIDEO 1\n#define PJMEDIA_HAS_VID_TOOLBOX_CODEC 1\n" > pjlib/include/pj/config_site.h
-    - name: configure
-      run: CFLAGS="-I/usr/local/include -I/usr/local/opt/openssl/include -fPIC" LDFLAGS="-L/usr/local/lib -L/usr/local/opt/openssl/lib" CXXFLAGS="-fPIC" ./configure
-    - name: make
-      run: make
-    - name: swig bindings
-      run: cd pjsip-apps/src/swig && make
+      run: |
+        echo "" > pjlib\include\pj\config_site.h        
+        Add-Content config_site.h "#define PJMEDIA_HAS_VIDEO 1"
+        Add-Content config_site.h "#define PJMEDIA_HAS_FFMPEG 1"
+        Add-Content config_site.h "#define PJMEDIA_HAS_FFMPEG_VID_CODEC 1"
+        Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_FFMPEG 1"
+        Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 1"
+      shell: powershell
+    - name: check VsDevCmd.bat
+      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      shell: cmd
+    - name: MSBuild
+      working-directory: .
+      run: |
+        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\libffpmeg_build\include;D:\a\pjproject\pjproject\libx264_build\include;D:\a\pjproject\pjproject\libsdl_build\include\SDL
+        set LIB=%LIB%;D:\a\pjproject\pjproject\libffpmeg_build\lib\x86;D:\a\pjproject\pjproject\libx264_build\lib\x86;D:\a\pjproject\pjproject\libsdl_build\lib\x86
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+      shell: cmd
