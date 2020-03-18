@@ -1,6 +1,22 @@
 name: BUILD WIN
 on: [push]
 jobs:
+  build-ubuntu-default-full-bundle-2:
+  # full bundle 2: running pjnath test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: install dependencies
+      run: sudo apt-get install -y libopencore-amrnb-dev
+    - name: config site
+      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+    - name: unit tests
+      run: make pjnath-test
+      
   build-windows-default:
     runs-on: windows-latest
     steps:
