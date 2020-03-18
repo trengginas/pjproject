@@ -90,6 +90,7 @@ jobs:
       shell: cmd
     - name: unit tests
       run: |
+        NetSh Advfirewall set allprofiles state off
         $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
         cd pjnath/bin; ./pjnath-test-i386-Win32-vc14-Release.exe
       shell: powershell
