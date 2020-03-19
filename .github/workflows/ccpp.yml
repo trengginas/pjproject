@@ -96,6 +96,10 @@ jobs:
     - name: check VsDevCmd.bat
       run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
+    - name: disable firewall
+      run: netSh advfirewall set allprofiles state off
+    - name: check firewall
+      run: netsh advfirewall show all
     - name: MSBuild
       working-directory: .
       run: |
@@ -105,8 +109,7 @@ jobs:
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
-      run: |
-        NetSh Advfirewall set allprofiles state off
+      run: |        
         $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
         cd pjnath/bin; ./pjnath-test-i386-Win32-vc14-Release.exe
       shell: powershell
