@@ -449,6 +449,19 @@ send_pkt:
 	goto on_return;
 
     len = size;
+
+        /* DUMP send message!!*/
+        {
+            char buff[1000];
+            PJ_LOG(5, (THIS_FILE,
+                   "STUN SendTo %d bytes STUN message:\n"
+                   "--- begin STUN message ---\n"
+                   "%s"
+                   "--- end of STUN message ---\n",
+                   size,
+                   pj_stun_msg_dump(resp, buff, sizeof(buff), NULL)));
+        }
+
     status = pj_activesock_sendto(asock, &test_srv->send_key, data, &len,
 				  0, src_addr, addr_len);
 
@@ -904,7 +917,7 @@ send_pkt:
         {
             char buff[1000];
             PJ_LOG(5, (THIS_FILE,
-                   "SendTo %d bytes STUN message:\n"
+                   "TURN SendTo %d bytes STUN message:\n"
                    "--- begin STUN message ---\n"
                    "%s"
                    "--- end of STUN message ---\n",
@@ -1075,6 +1088,18 @@ static pj_bool_t alloc_on_data_recvfrom(pj_activesock_t *asock,
     sent = size;
     PJ_LOG(5,("", "Forwarding %d bytes data from peer %s to client %s", 
 		   sent, peer_info, client_info));
+
+    /* DUMP send message!!*/
+    {
+        char buff[1000];
+        PJ_LOG(5, (THIS_FILE,
+                   "Forwarding SendTo %d bytes STUN message:\n"
+                   "--- begin STUN message ---\n"
+                   "%s"
+                   "--- end of STUN message ---\n",
+                   size,
+                   pj_stun_msg_dump(alloc->data_ind, buff, sizeof(buff), NULL)));
+    }
 
     pj_activesock_sendto(alloc->test_srv->turn_sock, &alloc->send_key, buffer,
 			 &sent, 0, &alloc->client_addr,
