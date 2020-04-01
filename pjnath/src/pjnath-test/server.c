@@ -899,6 +899,18 @@ send_pkt:
 	    goto on_return;
 
 	len = size;
+
+        /* DUMP send message!!*/
+        {
+            char buff[1000];
+            PJ_LOG(5, (THIS_FILE,
+                   "SendTo %d bytes STUN message:\n"
+                   "--- begin STUN message ---\n"
+                   "%s"
+                   "--- end of STUN message ---\n",
+                   size,
+                   pj_stun_msg_dump(resp, buff, sizeof(buff), NULL)));
+        }
 	switch (tp_type) {
 	case PJ_TURN_TP_TCP:
 	    status = pj_activesock_send(test_srv->cl_turn_sock, 
