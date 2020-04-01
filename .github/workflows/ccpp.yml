@@ -25,6 +25,10 @@ jobs:
       run:
         echo "" > pjlib/include/pj/config_site.h
       shell: powershell
+    - name: route print
+      run:
+        route print
+      shell: powershell
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.0
       with:
