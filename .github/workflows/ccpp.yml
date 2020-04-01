@@ -100,6 +100,10 @@ jobs:
     - name: check VsDevCmd.bat
       run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
+    - name: route print
+      run:
+        route print
+      shell: powershell      
     - name: disable firewall
       run: netSh advfirewall set allprofiles state off
     - name: check firewall
