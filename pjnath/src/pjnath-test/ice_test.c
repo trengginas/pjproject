@@ -921,161 +921,161 @@ int ice_test(void)
 	return -7;
     }
 
-    /* Simple test first with host candidate */
-    if (1) {
-	struct sess_cfg_t cfg =
-	{
-	    "Basic with host candidates",
-	    0x0,
-	    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
-	    {ROLE1,	1,	YES,     NO,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
-	    {ROLE2,	1,	YES,     NO,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
-	};
+ //   /* Simple test first with host candidate */
+ //   if (1) {
+	//struct sess_cfg_t cfg =
+	//{
+	//    "Basic with host candidates",
+	//    0x0,
+	//    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
+	//    {ROLE1,	1,	YES,     NO,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
+	//    {ROLE2,	1,	YES,     NO,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
+	//};
 
-	rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
+	//rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
 
-	cfg.ua1.comp_cnt = 2;
-	cfg.ua2.comp_cnt = 2;
-	rc = perform_test("Basic with host candidates, 2 components",
-			  &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
-    }
+	//cfg.ua1.comp_cnt = 2;
+	//cfg.ua2.comp_cnt = 2;
+	//rc = perform_test("Basic with host candidates, 2 components",
+	//		  &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
+ //   }
 
-    /* Simple test first with srflx candidate */
-    if (1) {
-	struct sess_cfg_t cfg =
-	{
-	    "Basic with srflx candidates",
-	    0xFFFF,
-	    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
-	    {ROLE1,	1,	YES,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
-	    {ROLE2,	1,	YES,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
-	};
+ //   /* Simple test first with srflx candidate */
+ //   if (1) {
+	//struct sess_cfg_t cfg =
+	//{
+	//    "Basic with srflx candidates",
+	//    0xFFFF,
+	//    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
+	//    {ROLE1,	1,	YES,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
+	//    {ROLE2,	1,	YES,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
+	//};
 
-	rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
+	//rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
 
-	cfg.ua1.comp_cnt = 2;
-	cfg.ua2.comp_cnt = 2;
+	//cfg.ua1.comp_cnt = 2;
+	//cfg.ua2.comp_cnt = 2;
 
-	rc = perform_test("Basic with srflx candidates, 2 components",
-			  &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
-    }
+	//rc = perform_test("Basic with srflx candidates, 2 components",
+	//		  &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
+ //   }
 
-    /* Simple test with relay candidate */
-    if (1) {
-	struct sess_cfg_t cfg =
-	{
-	    "Basic with relay candidates",
-	    0xFFFF,
-	    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
-	    {ROLE1,	1,	 NO,     NO,	  YES,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
-	    {ROLE2,	1,	 NO,     NO,	  YES,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
-	};
+ //   /* Simple test with relay candidate */
+ //   if (1) {
+	//struct sess_cfg_t cfg =
+	//{
+	//    "Basic with relay candidates",
+	//    0xFFFF,
+	//    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
+	//    {ROLE1,	1,	 NO,     NO,	  YES,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}},
+	//    {ROLE2,	1,	 NO,     NO,	  YES,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJ_SUCCESS, PJ_SUCCESS}}
+	//};
 
-	rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
+	//rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
 
-	cfg.ua1.comp_cnt = 2;
-	cfg.ua2.comp_cnt = 2;
+	//cfg.ua1.comp_cnt = 2;
+	//cfg.ua2.comp_cnt = 2;
 
-	rc = perform_test("Basic with relay candidates, 2 components",
-			  &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
-    }
+	//rc = perform_test("Basic with relay candidates, 2 components",
+	//		  &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
+ //   }
 
-    /* Failure test with STUN resolution */
-    if (1) {
-	struct sess_cfg_t cfg =
-	{
-	    "STUN resolution failure",
-	    0x0,
-	    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
-	    {ROLE1,	2,	 NO,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}},
-	    {ROLE2,	2,	 NO,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}}
-	};
+ //   /* Failure test with STUN resolution */
+ //   if (1) {
+	//struct sess_cfg_t cfg =
+	//{
+	//    "STUN resolution failure",
+	//    0x0,
+	//    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
+	//    {ROLE1,	2,	 NO,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}},
+	//    {ROLE2,	2,	 NO,    YES,	    NO,	    0,	    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}}
+	//};
 
-	rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
+	//rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
 
-	cfg.ua1.client_flag |= DEL_ON_ERR;
-	cfg.ua2.client_flag |= DEL_ON_ERR;
+	//cfg.ua1.client_flag |= DEL_ON_ERR;
+	//cfg.ua2.client_flag |= DEL_ON_ERR;
 
-	rc = perform_test("STUN resolution failure with destroy on callback",
-			  &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
-    }
+	//rc = perform_test("STUN resolution failure with destroy on callback",
+	//		  &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
+ //   }
 
-    /* Failure test with TURN resolution */
-    if (1) {
-	struct sess_cfg_t cfg =
-	{
-	    "TURN allocation failure",
-	    0xFFFF,
-	    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
-	    {ROLE1,	2,	 NO,    NO,	YES, WRONG_TURN,    0,	    0,	    0, {PJ_SUCCESS, PJ_STATUS_FROM_STUN_CODE(401), -1}},
-	    {ROLE2,	2,	 NO,    NO,	YES, WRONG_TURN,    0,	    0,	    0, {PJ_SUCCESS, PJ_STATUS_FROM_STUN_CODE(401), -1}}
-	};
+ //   /* Failure test with TURN resolution */
+ //   if (1) {
+	//struct sess_cfg_t cfg =
+	//{
+	//    "TURN allocation failure",
+	//    0xFFFF,
+	//    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
+	//    {ROLE1,	2,	 NO,    NO,	YES, WRONG_TURN,    0,	    0,	    0, {PJ_SUCCESS, PJ_STATUS_FROM_STUN_CODE(401), -1}},
+	//    {ROLE2,	2,	 NO,    NO,	YES, WRONG_TURN,    0,	    0,	    0, {PJ_SUCCESS, PJ_STATUS_FROM_STUN_CODE(401), -1}}
+	//};
 
-	rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
+	//rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
 
-	cfg.ua1.client_flag |= DEL_ON_ERR;
-	cfg.ua2.client_flag |= DEL_ON_ERR;
+	//cfg.ua1.client_flag |= DEL_ON_ERR;
+	//cfg.ua2.client_flag |= DEL_ON_ERR;
 
-	rc = perform_test("TURN allocation failure with destroy on callback",
-			  &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
-    }
+	//rc = perform_test("TURN allocation failure with destroy on callback",
+	//		  &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
+ //   }
 
 
-    /* STUN failure, testing TURN deallocation */
-    if (1) {
-	struct sess_cfg_t cfg =
-	{
-	    "STUN failure, testing TURN deallocation",
-	    0xFFFF & (~(CREATE_STUN_SERVER)),
-	    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
-	    {ROLE1,	1,	 YES,    YES,	YES,	0,    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}},
-	    {ROLE2,	1,	 YES,    YES,	YES,	0,    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}}
-	};
+ //   /* STUN failure, testing TURN deallocation */
+ //   if (1) {
+	//struct sess_cfg_t cfg =
+	//{
+	//    "STUN failure, testing TURN deallocation",
+	//    0xFFFF & (~(CREATE_STUN_SERVER)),
+	//    /*  Role    comp#   host?   stun?   turn?   flag?  ans_del snd_del des_del */
+	//    {ROLE1,	1,	 YES,    YES,	YES,	0,    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}},
+	//    {ROLE2,	1,	 YES,    YES,	YES,	0,    0,	    0,	    0, {PJ_SUCCESS, PJNATH_ESTUNTIMEDOUT, -1}}
+	//};
 
-	rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
+	//rc = perform_test(cfg.title, &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
 
-	cfg.ua1.client_flag |= DEL_ON_ERR;
-	cfg.ua2.client_flag |= DEL_ON_ERR;
+	//cfg.ua1.client_flag |= DEL_ON_ERR;
+	//cfg.ua2.client_flag |= DEL_ON_ERR;
 
-	rc = perform_test("STUN failure, testing TURN deallocation (cb)",
-			  &stun_cfg, cfg.server_flag,
-			  &cfg.ua1, &cfg.ua2);
-	if (rc != 0)
-	    goto on_return;
-    }
+	//rc = perform_test("STUN failure, testing TURN deallocation (cb)",
+	//		  &stun_cfg, cfg.server_flag,
+	//		  &cfg.ua1, &cfg.ua2);
+	//if (rc != 0)
+	//    goto on_return;
+ //   }
 
     rc = 0;
     /* Iterate each test item */
@@ -1111,12 +1111,12 @@ int ice_test(void)
 		cfg->ua2.role = role[j].ua2;
 
 		/* For each test item, test with different number of components */
-		for (k1=1; k1<=2; ++k1) {
+		for (k1=2; k1<=2; ++k1) {
 		    unsigned k2;
 
 		    cfg->ua1.comp_cnt = k1;
 
-		    for (k2=1; k2<=2; ++k2) {
+		    for (k2=2; k2<=2; ++k2) {
 			char title[120];
 
 			sprintf(title,
