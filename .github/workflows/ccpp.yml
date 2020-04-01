@@ -1,6 +1,22 @@
 name: BUILD WIN
 on: [push]
 jobs:
+  build-ubuntu-default-full-bundle-2:
+  # full bundle 2: running pjnath test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: install dependencies
+      run: sudo apt-get install -y libopencore-amrnb-dev
+    - name: config site
+      run: cd pjlib/include/pj && cp config_site_test.h config_site.h
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+    - name: unit tests
+      run: make pjnath-test
+      
   build-windows-default:
     runs-on: windows-latest
     steps:
@@ -80,6 +96,10 @@ jobs:
     - name: check VsDevCmd.bat
       run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
+    - name: disable firewall
+      run: netSh advfirewall set allprofiles state off
+    - name: check firewall
+      run: netsh advfirewall show all
     - name: MSBuild
       working-directory: .
       run: |
@@ -89,8 +109,7 @@ jobs:
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
-      run: |
-        NetSh Advfirewall set allprofiles state off
+      run: |        
         $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
         cd pjnath/bin; ./pjnath-test-i386-Win32-vc14-Release.exe
       shell: powershell
