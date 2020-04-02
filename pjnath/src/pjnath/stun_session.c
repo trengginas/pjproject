@@ -571,6 +571,8 @@ PJ_DEF(pj_status_t) pj_stun_session_create( pj_stun_config *cfg,
 
     *p_sess = sess;
 
+    TRACE_((THIS_FILE, "STUN session %p created", sess));
+
     return PJ_SUCCESS;
 }
 
@@ -926,11 +928,11 @@ static void dump_tx_msg(pj_stun_session *sess, const pj_stun_msg *msg,
     pj_sockaddr_print(addr, dst_name, sizeof(dst_name), 3);
 
     PJ_LOG(5,(SNAME(sess), 
-	      "TX %d bytes STUN message to %s:\n"
+	      "%p TX %d bytes STUN message to %s:\n"
 	      "--- begin STUN message ---\n"
 	      "%s"
 	      "--- end of STUN message ---\n",
-	      pkt_size, dst_name, 
+	      sess, pkt_size, dst_name, 
 	      pj_stun_msg_dump(msg, sess->dump_buf, sizeof(sess->dump_buf), 
 			       NULL)));
 
@@ -1441,11 +1443,11 @@ static void dump_rx_msg(pj_stun_session *sess, const pj_stun_msg *msg,
     pj_sockaddr_print(addr, src_info, sizeof(src_info), 3);
 
     PJ_LOG(5,(SNAME(sess),
-	      "RX %d bytes STUN message from %s:\n"
+	      "%p RX %d bytes STUN message from %s:\n"
 	      "--- begin STUN message ---\n"
 	      "%s"
 	      "--- end of STUN message ---\n",
-	      pkt_size, src_info,
+	      sess, pkt_size, src_info,
 	      pj_stun_msg_dump(msg, sess->dump_buf, sizeof(sess->dump_buf), 
 			       NULL)));
 

@@ -379,6 +379,16 @@ PJ_DEF(pj_status_t) pj_stun_sock_create( pj_stun_config *stun_cfg,
     stun_sock->ka_timer.cb = &ka_timer_cb;
     stun_sock->ka_timer.user_data = stun_sock;
 
+    {
+        int namelen;
+        char addrinfo[PJ_INET6_ADDRSTRLEN+10];
+
+        status = pj_sock_getsockname(stun_sock->sock_fd, &bound_addr, &namelen);
+
+        PJ_LOG(4,(stun_sock->obj_name, "Created STUN sock %p %s", stun_sock->stun_sess,
+                  pj_sockaddr_print(&bound_addr, addrinfo, sizeof(addrinfo), 3)));
+    }
+
     /* Done */
     *p_stun_sock = stun_sock;
     return PJ_SUCCESS;
