@@ -59,7 +59,7 @@ jobs:
     - name: MSBuild
       working-directory: .
       run: |
-        $VS_CMD=${env:VS140COMNTOOLS} + "VsDevCmd.bat"
+        $VS_CMD=${env:VS160COMNTOOLS} + "VsDevCmd.bat"
         dir $VS_CMD
         cmd.exe /k $VS_CMD
         powershell
