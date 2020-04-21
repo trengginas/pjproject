@@ -65,8 +65,8 @@ jobs:
         $OPENSSL_DIR=[System.Environment]::GetEnvironmentVariable('OpenSSLDir','Machine')
         dir $OPENSSL_DIR\include
         dir $OPENSSL_DIR\lib
-        $env:INCLUDE+=;$OPENSSL_DIR\include
-        $env:LIB+=;$OPENSSL_DIR\lib
+        $env:INCLUDE+=";$OPENSSL_DIR\include"
+        $env:LIB+=";$OPENSSL_DIR\lib"
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: powershell
     - name: unit tests
