@@ -61,7 +61,7 @@ jobs:
       run: |
         $VS_CMD=${env:ProgramFiles(x86)} + "\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         dir $VS_CMD
-        & $VS_CMD
+        cmd.exe /c $VS_CMD
         $OPENSSL_DIR=[System.Environment]::GetEnvironmentVariable('OpenSSLDir','Machine')
         dir $OPENSSL_DIR\include
         dir $OPENSSL_DIR\lib
