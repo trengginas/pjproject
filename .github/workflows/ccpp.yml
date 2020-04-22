@@ -61,10 +61,12 @@ jobs:
     - name: MSBuild
       working-directory: .
       run: |
-        echo $pwd.PATH
+        pwd
         dir openssl_dir.txt
         set /P OPENSSL_DIR=<openssl_dir.txt
         call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        echo %OPENSSL_DIR%\include
+        echo %OPENSSL_DIR%\lib
         dir %OPENSSL_DIR%\include
         dir %OPENSSL_DIR%\lib
         set INCLUDE=%INCLUDE%;%OPENSSL_DIR%\include
