@@ -63,7 +63,9 @@ jobs:
       run: |
         pwd
         dir openssl_dir.txt
+        type openssl_dir.txt
         set /P OPENSSL_DIR=<openssl_dir.txt
+        echo %OPENSSL_DIR%
         call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         echo %OPENSSL_DIR%\include
         echo %OPENSSL_DIR%\lib
