@@ -73,6 +73,8 @@ jobs:
         dir %OPENSSL_DIR%\lib
         set INCLUDE=%INCLUDE%;%OPENSSL_DIR%\include
         set LIB=%LIB%;$OPENSSL_DIR%\lib
+        echo %INCLUDE%
+        echo %LIB%
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
