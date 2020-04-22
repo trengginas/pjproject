@@ -50,37 +50,33 @@ jobs:
         Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\;
         cd openssl_build\openssl-1.1\x86
         Add-Content ..\..\..\openssl_dir.txt $pwd.Path
-        cd ..\..\..
-        echo $pwd.PATH
-        type openssl_dir.txt
       shell: powershell
+    - name: check openssl folder
+      run: |
+        set /P OPENSSL_DIR=<openssl_dir.txt
+        dir %OPENSSL_DIR%\include
+        dir %OPENSSL_DIR%\lib
+      shell: cmd
     - name: config site
       run:
         cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
       shell: powershell
+    - name: check VsDevCmd.bat
+      run: dir "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      shell: cmd      
     - name: MSBuild
       working-directory: .
       run: |
-        pwd
-        dir openssl_dir.txt
-        type openssl_dir.txt
         set /P OPENSSL_DIR=<openssl_dir.txt
-        echo %OPENSSL_DIR%
         call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        echo %OPENSSL_DIR%\include
-        echo %OPENSSL_DIR%\lib
-        dir %OPENSSL_DIR%\include
-        dir %OPENSSL_DIR%\lib
         set INCLUDE=%INCLUDE%;%OPENSSL_DIR%\include
         set LIB=%LIB%;%OPENSSL_DIR%\lib
-        echo %INCLUDE%
-        echo %LIB%
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
       run: |
         $env:OPENSSL_DIR = Get-Content .\openssl_dir.txt
-        $env:PATH+=";$OPENSSL_DIR\bin"
+        $env:PATH+=";$env:OPENSSL_DIR\bin"
         cd pjlib/bin; ./pjlib-test-i386-Win32-vc14-Release.exe
         cd ../../pjlib-util/bin; ./pjlib-util-test-i386-Win32-vc14-Release.exe
         cd ../../pjmedia/bin/; ./pjmedia-test-i386-Win32-vc14-Release.exe
@@ -94,19 +90,23 @@ jobs:
       run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
       shell: powershell
     - name: expand openssl
-      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+      run: |
+        Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+        cd openssl_build\openssl-1.1\x86
+        Add-Content ..\..\..\openssl_dir.txt $pwd.Path
       shell: powershell
     - name: check openssl folder
       run: |
-        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
-        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
-      shell: powershell    
+        set /P OPENSSL_DIR=<openssl_dir.txt
+        dir %OPENSSL_DIR%\include
+        dir %OPENSSL_DIR%\lib
+      shell: cmd
     - name: config site
       run:
         cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
       shell: powershell
     - name: check VsDevCmd.bat
-      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      run: dir "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
     - name: route print
       run:
@@ -118,15 +118,18 @@ jobs:
       run: netsh advfirewall show all
     - name: MSBuild
       working-directory: .
-      run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
-        set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
+      run: |        
+        set /P OPENSSL_DIR=<openssl_dir.txt
+        call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;%OPENSSL_DIR%\include
+        set LIB=%LIB%;%OPENSSL_DIR%\lib
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
-      run: |        
-        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
+      run: |     
+        $env:OPENSSL_DIR = Get-Content .\openssl_dir.txt
+        $env:PATH+=";$env:OPENSSL_DIR\bin"
+        $env:PATH+=";%OPENSSL_DIR%\bin"
         cd pjnath/bin; ./pjnath-test-i386-Win32-vc14-Release.exe
       shell: powershell
 
@@ -138,31 +141,37 @@ jobs:
       run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
       shell: powershell
     - name: expand openssl
-      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+      run: |
+        Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+        cd openssl_build\openssl-1.1\x86
+        Add-Content ..\..\..\openssl_dir.txt $pwd.Path
       shell: powershell
     - name: check openssl folder
       run: |
-        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
-        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
-      shell: powershell    
+        set /P OPENSSL_DIR=<openssl_dir.txt
+        dir "%OPENSSL_DIR%\include"
+        dir "%OPENSSL_DIR%\lib"
+      shell: cmd  
     - name: config site
       run:
         cd pjlib/include/pj; cp config_site_test.h config_site.h; Add-Content config_site.h "#define PJ_HAS_SSL_SOCK 1"
       shell: powershell
     - name: check VsDevCmd.bat
-      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      run: dir "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
     - name: MSBuild
       working-directory: .
-      run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include
-        set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib
+      run: |        
+        set /P OPENSSL_DIR=<openssl_dir.txt
+        call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;%OPENSSL_DIR%\include
+        set LIB=%LIB%;%OPENSSL_DIR%\lib
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
       run: |
-        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin"
+        $env:OPENSSL_DIR = Get-Content .\openssl_dir.txt
+        $env:PATH+=";$env:OPENSSL_DIR\bin"
         cd pjsip/bin; ./pjsip-test-i386-Win32-vc14-Release.exe
       shell: powershell
 
@@ -174,13 +183,17 @@ jobs:
       run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/gnutls/releases/download/gnutls_3_6_11/libgnutls_gnutls_3_6_11_msvc14.zip" -Outfile ".\libgnutls.zip"      
       shell: powershell
     - name: expand gnutls
-      run: Expand-Archive -LiteralPath .\libgnutls.zip -DestinationPath .\libgnutls_build\; pwd
+      run: |
+        Expand-Archive -LiteralPath .\libgnutls.zip -DestinationPath .\libgnutls_build\; pwd
+        cd libgnutls_build
+        Add-Content ..\libgnutls_dir.txt $pwd.Path
       shell: powershell
     - name: check gnutls folder
       run: |
-        dir "D:\a\pjproject\pjproject\libgnutls_build\include"
-        dir "D:\a\pjproject\pjproject\libgnutls_build\lib\x86"
-      shell: powershell    
+        set /P LIBGNUTLS_DIR=<libgnutls_dir.txt
+        dir "%LIBGNUTLS_DIR%\include"
+        dir "%LIBGNUTLS_DIR%\lib\x86"
+      shell: cmd    
     - name: config site
       run: |
         echo "" > pjlib\include\pj\config_site.h
@@ -188,15 +201,16 @@ jobs:
         Add-Content config_site.h "#define PJ_SSL_SOCK_IMP PJ_SSL_SOCK_IMP_GNUTLS"
       shell: powershell
     - name: check VsDevCmd.bat
-      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      run: dir "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
     - name: MSBuild
       working-directory: .
-      run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\libgnutls_build\include
-        set LIB=%LIB%;D:\a\pjproject\pjproject\libgnutls_build\lib\x86
-        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
+      run: |        
+        set /P LIBGNUTLS_DIR=<gnutls_dir.txt
+        call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;%LIBGNUTLS_DIR%\include
+        set LIB=%LIB%;%LIBGNUTLS_DIR%\lib\x86
+        msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true      
       shell: cmd
 
   build-windows-video-libvpx:
@@ -207,35 +221,47 @@ jobs:
       run: Invoke-WebRequest -Uri "https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1e-dev.zip" -OutFile ".\openssl.zip"
       shell: powershell
     - name: expand openssl
-      run: Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+      run: |
+        Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\; pwd
+        cd openssl_build\openssl-1.1\x86
+        Add-Content ..\..\..\openssl_dir.txt $pwd.Path
       shell: powershell
     - name: check openssl folder
       run: |
-        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include"
-        dir "D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib"
-      shell: powershell      
+        set /P OPENSSL_DIR=<openssl_dir.txt
+        dir "%OPENSSL_DIR%\include"
+        dir "%OPENSSL_DIR%\lib"
+      shell: cmd      
     - name: get libvpx
       run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/libvpx/releases/download/v1.8.2/libvpx_v1.8.2_msvc14.zip" -Outfile "libvpx.zip"
       shell: powershell
     - name: expand libvpx
-      run: Expand-Archive -LiteralPath .\libvpx.zip -DestinationPath .\libvpx_build\; pwd
-      shell: powershell      
+      run: |
+        Expand-Archive -LiteralPath .\libvpx.zip -DestinationPath .\libvpx_build\; pwd
+        cd libvpx_build
+        Add-Content ..\libvpx_dir.txt $pwd.Path
+      shell: powershell
     - name: check libvpx folder
       run: |
-        dir "D:\a\pjproject\pjproject\libvpx_build\include"
-        dir "D:\a\pjproject\pjproject\libvpx_build\lib\x86"
-      shell: powershell
+        set /P LIBVPX_DIR=<libvpx_dir.txt
+        dir "%LIBVPX_DIR%\include"
+        dir "%LIBVPX_DIR%\lib\x86"
+      shell: cmd
     - name: get libsdl
       run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/SDL/releases/download/release-2.0.9/libsdl_release-2.0.9_msvc14.zip" -Outfile ".\libsdl.zip"
       shell: powershell
     - name: expand libsdl
-      run: Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\; pwd
-      shell: powershell      
+      run: |
+        Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\; pwd
+        cd libsdl_build
+        Add-Content ..\libsdl_dir.txt $pwd.Path
+      shell: powershell
     - name: check libsdl folder
       run: |
-        dir "D:\a\pjproject\pjproject\libsdl_build\include\SDL"
-        dir "D:\a\pjproject\pjproject\libsdl_build\lib\x86"
-      shell: powershell      
+        set /P LIBSDL_DIR=<libsdl_dir.txt
+        dir "%LIBSDL_DIR%\include\SDL"
+        dir "%LIBSDL_DIR%\lib\x86"
+      shell: cmd
     - name: config site
       run: |
         cd pjlib/include/pj; cp config_site_test.h config_site.h
@@ -247,23 +273,29 @@ jobs:
         Add-Content config_site.h "#define PJMEDIA_HAS_VPX_CODEC 1"
       shell: powershell
     - name: check VsDevCmd.bat
-      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      run: dir "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
     - name: MSBuild
       working-directory: .
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\include;D:\a\pjproject\pjproject\libsdl_build\include\SDL;D:\a\pjproject\pjproject\libvpx_build\include
-        set LIB=%LIB%;D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\lib;D:\a\pjproject\pjproject\libvpx_build\lib\x86;D:\a\pjproject\pjproject\libsdl_build\lib\x86
+        set /P OPENSSL_DIR=<openssl_dir.txt
+        set /P LIBVPX_DIR=<libvpx_dir.txt
+        set /P LIBSDL_DIR=<libsdl_dir.txt
+        call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;%OPENSSL_DIR%\include;%LIBVPX_DIR%\include;%LIBSDL_DIR%\include\SDL
+        set LIB=%LIB%;%OPENSSL_DIR%\lib;%LIBVPX_DIR%\lib\x86;%LIBSDL_DIR%\lib\x86
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
     - name: unit tests
-      run: |
-        $env:PATH+=";D:\a\pjproject\pjproject\openssl_build\openssl-1.1\x86\bin;D:\a\pjproject\pjproject\libvpx_build\bin\x86;D:\a\pjproject\pjproject\libsdl_build\bin\x86;"
+      run: |        
+        $env:OPENSSL_DIR = Get-Content .\openssl_dir.txt
+        $env:LIBVPX_DIR = Get-Content .\libvpx_dir.txt
+        $env:LIBSDL_DIR = Get-Content .\libsdl_dir.txt
+        $env:PATH+=";$env:OPENSSL_DIR\bin;$env:LIBVPX_DIR\bin\x86;$env:LIBSDL_DIR\bin\x86;"
         cd pjlib/bin; ./pjlib-test-i386-Win32-vc14-Release.exe
         cd ../../pjlib-util/bin; ./pjlib-util-test-i386-Win32-vc14-Release.exe
         cd ../../pjmedia/bin/; ./pjmedia-test-i386-Win32-vc14-Release.exe
-      shell: powershell      
+      shell: powershell
 
   build-windows-video-ffmpeg:
     runs-on: windows-latest
@@ -273,35 +305,47 @@ jobs:
       run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/FFmpeg/releases/download/4.3.r96746/libffmpeg_4.3.r96746_msvc14_x86.zip" -Outfile "libffmpeg.zip"
       shell: powershell
     - name: expand ffmpeg
-      run: Expand-Archive -LiteralPath .\libffmpeg.zip -DestinationPath .\libffmpeg_build\; pwd
-      shell: powershell      
+      run: |
+        Expand-Archive -LiteralPath .\libffmpeg.zip -DestinationPath .\libffmpeg_build\; pwd
+        cd libffmpeg_build
+        Add-Content ..\libffmpeg_dir.txt $pwd.Path
+      shell: powershell
     - name: check ffmpeg folder
       run: |
-        dir "D:\a\pjproject\pjproject\libffmpeg_build\include"
-        dir "D:\a\pjproject\pjproject\libffmpeg_build\lib\x86"
-      shell: powershell
+        set /P LIBFFMPEG_DIR=<libffmpeg_dir.txt
+        dir "%LIBFFMPEG_DIR%\include"
+        dir "%LIBFFMPEG_DIR%\lib\x86"  
+      shell: cmd
     - name: get libx264
       run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/x264/releases/download/0.159.r2991/libx264_0.159.r2991_msvc14.zip" -Outfile ".\libx264.zip"
       shell: powershell
     - name: expand libx264
-      run: Expand-Archive -LiteralPath .\libx264.zip -DestinationPath .\libx264_build\; pwd
-      shell: powershell      
-    - name: check ffmpeg folder
       run: |
-        dir "D:\a\pjproject\pjproject\libx264_build\include"
-        dir "D:\a\pjproject\pjproject\libx264_build\lib\x86"
-      shell: powershell      
+        Expand-Archive -LiteralPath .\libx264.zip -DestinationPath .\libx264_build\; pwd
+        cd libx264_build
+        Add-Content ..\libx264_dir.txt $pwd.Path
+      shell: powershell
+    - name: check libx264 folder
+      run: |
+        set /P LIBX264_DIR=<libx264_dir.txt
+        dir "%LIBX264_DIR%\include"
+        dir "%LIBX264_DIR%\lib\x86"
+      shell: cmd
     - name: get libsdl
       run: Invoke-WebRequest -Uri "https://github.com/ShiftMediaProject/SDL/releases/download/release-2.0.9/libsdl_release-2.0.9_msvc14.zip" -Outfile ".\libsdl.zip"
       shell: powershell
     - name: expand libsdl
-      run: Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\; pwd
-      shell: powershell      
+      run: |
+        Expand-Archive -LiteralPath .\libsdl.zip -DestinationPath .\libsdl_build\; pwd
+        cd libsdl_build
+        Add-Content ..\libsdl_dir.txt $pwd.Path        
+      shell: powershell
     - name: check libsdl folder
       run: |
-        dir "D:\a\pjproject\pjproject\libsdl_build\include\SDL"
-        dir "D:\a\pjproject\pjproject\libsdl_build\lib\x86"
-      shell: powershell
+        set /P LIBSDL_DIR=<libsdl_dir.txt
+        dir "%LIBSDL_DIR%\include\SDL"
+        dir "%LIBSDL_DIR%\lib\x86"
+      shell: cmd
     - name: config site
       run: |
         echo "" > pjlib\include\pj\config_site.h        
@@ -312,13 +356,16 @@ jobs:
         Add-Content config_site.h "#define PJMEDIA_VIDEO_DEV_HAS_SDL 1"
       shell: powershell
     - name: check VsDevCmd.bat
-      run: dir "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+      run: dir "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
       shell: cmd
     - name: MSBuild
       working-directory: .
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
-        set INCLUDE=%INCLUDE%;D:\a\pjproject\pjproject\libffpmeg_build\include;D:\a\pjproject\pjproject\libx264_build\include;D:\a\pjproject\pjproject\libsdl_build\include\SDL
-        set LIB=%LIB%;D:\a\pjproject\pjproject\libffpmeg_build\lib\x86;D:\a\pjproject\pjproject\libx264_build\lib\x86;D:\a\pjproject\pjproject\libsdl_build\lib\x86
+        set /P LIBFFMPEG_DIR=<libffmpeg_dir.txt
+        set /P LIBX264_DIR=<libx264_dir.txt
+        set /P LIBSDL_DIR=<libsdl_dir.txt
+        call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
+        set INCLUDE=%INCLUDE%;%LIBFFMPEG_DIR%\include;%LIBX264_DIR%\include;%LIBSDL_DIR%\include\SDL
+        set LIB=%LIB%;%LIBFFMPEG_DIR%\lib\x86;%LIBX264_DIR%\lib\x86;%LIBSDL_DIR%\lib\x86
         msbuild pjproject-vs14.sln /p:PlatformToolset=v142 /p:Configuration=Release /p:Platform=win32 /p:UseEnv=true
       shell: cmd
