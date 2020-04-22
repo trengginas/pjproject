@@ -49,7 +49,7 @@ jobs:
       run: |
         Expand-Archive -LiteralPath .\openssl.zip -DestinationPath .\openssl_build\;
         cd openssl_build\openssl-1.1\x86
-        $pwd.Path > ..\..\..\openssl_dir.txt
+        Add-Content ..\..\..\openssl_dir.txt $pwd.Path
         cd ..\..\..
         echo $pwd.PATH
         type openssl_dir.txt
