@@ -199,7 +199,7 @@ jobs:
       shell: powershell
     - name: set config site
       run:
-        echo "" > pjlib/include/pj/config_site.h
+        type nul > pjlib/include/pj/config_site.h
       shell: cmd
     - name: MSBuild
       run: |
