@@ -209,7 +209,9 @@ jobs:
     - name: build swig
       run: |
         set /P SWIG_PATH=<swig_path.txt
+        echo path=%PATH%
         set PATH=%PATH%;%SWIG_PATH%
+        echo path1=%PATH%
         call "%PROGRAMFILES(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsDevCmd.bat"
         set INCLUDE=%INCLUDE%;%JAVA_HOME%\include;%JAVA_HOME%\include\win32        
         cd pjsip-apps/build
