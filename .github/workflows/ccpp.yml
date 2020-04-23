@@ -23,7 +23,7 @@ jobs:
     - name: check
       run: |
         cd $env:JAVA_HOME
-        Get-ChildItem -Path . -Include jni.h -File -Recurse -ErrorAction SilentlyContinue
+        Get-ChildItem -Path . -Include jni_md.h -File -Recurse -ErrorAction SilentlyContinue
       shell: powershell      
       
   build-windows-default:
