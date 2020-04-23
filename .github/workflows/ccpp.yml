@@ -18,7 +18,7 @@ jobs:
       run: make pjnath-test
       
   search-jni:
-    run-on: windows-latest
+    runs-on: windows-latest
     steps:
     - name: check
       run: |
