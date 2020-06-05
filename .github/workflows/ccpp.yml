@@ -20,4 +20,4 @@ jobs:
     - name: disable firewall
       run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
     - name: unit tests
-      run: make pjlib-test pjmedia-test pjlib-util-test pjsua-test
+      run: make pjsua-test
