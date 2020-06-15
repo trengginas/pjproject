@@ -11,11 +11,11 @@ AC_CONFIG_HEADER([pjlib/include/pj/compat/os_auto.h
 		  pjmedia/include/pjmedia-codec/config_auto.h
 		  pjsip/include/pjsip/sip_autoconf.h
 		 ])
-AC_CONFIG_FILES([build.mak 
-		 build/os-auto.mak 
+AC_CONFIG_FILES([build.mak
+		 build/os-auto.mak
 		 build/cc-auto.mak
-		 pjlib/build/os-auto.mak 
-		 pjlib-util/build/os-auto.mak 
+		 pjlib/build/os-auto.mak
+		 pjlib-util/build/os-auto.mak
 		 pjmedia/build/os-auto.mak
 		 pjsip/build/os-auto.mak
 		 third_party/build/os-auto.mak
@@ -72,7 +72,7 @@ AC_SUBST(CC_CFLAGS)
 AC_SUBST(ac_pjdir)
 AC_SUBST(ac_build_mak_vars)
 
-case $host in 
+case $host in
     *mingw* | *cygw* | *win32* | *w32* )
 	if pwd -W 2&> /dev/null; then
 	   ac_pjdir=`pwd -W`
@@ -192,7 +192,7 @@ AC_ARG_ENABLE(floating-point,
 	       fi],
 	      [
 		AC_DEFINE(PJ_HAS_FLOATING_POINT,1)
-	        AC_MSG_RESULT([Checking if floating point is disabled... no]) 
+	        AC_MSG_RESULT([Checking if floating point is disabled... no])
 	      ])
 
 
@@ -429,7 +429,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([#include <pthread.h>],
 
 dnl ######################
 dnl # ioqueue selection
-dnl # 
+dnl #
 AC_SUBST(ac_os_objs)
 AC_SUBST(ac_linux_poll)
 AC_MSG_CHECKING([ioqueue backend])
@@ -771,7 +771,7 @@ AC_ARG_ENABLE(video,
 	      		     [Disable video feature]),
 	      [if test "$enable_video" = "no"; then
 	        #AC_DEFINE(PJMEDIA_HAS_VIDEO,0)
-                AC_MSG_RESULT([Video is disabled]) 
+                AC_MSG_RESULT([Video is disabled])
                 enable_sdl="no"
                 enable_ffmpeg="no"
                 enable_v4l2="no"
@@ -800,6 +800,7 @@ else
 	ac_pjmedia_video=android_os
 	AC_SUBST(ac_pjmedia_video_has_android)
 	AC_SUBST(ac_android_cflags)
+	AC_SUBST(ac_pjmedia_has_amediacodec)
 	SAVED_LIBS="$LIBS"
 	LIBS="-lGLESv2 -lEGL -landroid -lgcc -lc"
 	AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [])],[ac_pjmedia_video_has_android=yes],[ac_pjmedia_video_has_android=no])
@@ -811,7 +812,12 @@ else
 	else
 	  AC_MSG_RESULT([Checking if OpenGL ES 2 is available... no])
 	fi
-	ac_android_cflags="$ac_android_cflags -DPJMEDIA_VIDEO_DEV_HAS_ANDROID=1"
+	AC_CHECK_LIB(mediandk,AMediaCodec_createDecoderByType,[ac_pjmedia_has_amediacodec=1 && LIBS="-lmediandk $LIBS"])
+	if test "x$ac_pjmedia_has_amediacodec" = "x1"; then
+		AC_MSG_RESULT([Checking if Android AMediaCodec library is available... yes])
+	else
+		AC_MSG_RESULT([Checking if Android AMediaCodec library is available... no])
+	fi
 	;;
   *darwin*)
 	ac_pjmedia_video=darwin_os
@@ -1057,7 +1063,7 @@ AC_ARG_ENABLE(sdl,
                   else
 			AC_PATH_PROGS(SDL_CONFIG, sdl2-config sdl-config)
 		  fi
-		  
+
 		  AC_MSG_CHECKING([SDL availability])
 		  if test "x$SDL_CONFIG" = "x"; then
 			AC_MSG_RESULT([not found])
@@ -1134,13 +1140,13 @@ AC_ARG_ENABLE(ffmpeg,
 				ac_ffmpeg_cflags="$ac_ffmpeg_cflags -DPJMEDIA_HAS_LIBAVUTIL=1"
 				av_pkg="$av_pkg libavutil"
 			fi
-			
+
 			if test "x$av_pkg" == "x"; then
 			   AC_MSG_RESULT([none detected (check the prefix)! **])
 			else
 			   AC_MSG_RESULT([$av_pkg])
 			fi
-			
+
 			ac_ffmpeg_cflags="$ac_ffmpeg_cflags `$PKG_CONFIG --cflags $av_pkg`"
 			ac_ffmpeg_ldflags="$ac_ffmpeg_ldflags `$PKG_CONFIG --libs $av_pkg`"
 
@@ -1148,13 +1154,13 @@ AC_ARG_ENABLE(ffmpeg,
 			dnl #
 			dnl # Use hardcoded values to configure ffmpeg
 			dnl #
-			
+
 			AC_MSG_RESULT([*** Warning: neither pkg-config nor python is available, ffmpeg dependency cannot be calculated. If ffmpeg libraries are not detected, you need to specify the correct CFLAGS and LDFLAGS settings for ffmpeg prior to invoking configure ***])
-			
+
 			LIBS="-L$FFMPEG_PREFIX/lib $LIBS"
 			LDFLAGS="-L$FFMPEG_PREFIX/lib $LDFLAGS"
 			CFLAGS="-I$FFMPEG_PREFIX/include $CFLAGS"
-			
+
 			AC_CHECK_LIB(avdevice,
 				     avdevice_version,
 				     [ac_ffmpeg_cflags="$ac_ffmpeg_cflags -DPJMEDIA_HAS_LIBAVDEVICE=1"
@@ -1197,15 +1203,15 @@ AC_ARG_ENABLE(ffmpeg,
 				      ac_ffmpeg_ldflags="$ac_ffmpeg_ldflags -lavcore"
 				     ]
 				     )
-			
+
 		fi
-		
+
 		AC_CHECK_TYPES(enum AVPixelFormat,
 			       [],
 			       [ac_ffmpeg_cflags="$ac_ffmpeg_cflags -DPJMEDIA_USE_OLD_FFMPEG=1"],
 			       [[#include <libavformat/avformat.h>]]
 			     )
-				     
+
 		LIBS="$LIBS $ac_ffmpeg_ldflags"
 		export PKG_CONFIG_PATH=$SAVED_PKG_CONFIG_PATH
 	      ]
@@ -1260,25 +1266,25 @@ AC_ARG_ENABLE(openh264,
 		  if test "x$with_openh264" != "xno" -a "x$with_openh264" != "x"; then
 		        OPENH264_PREFIX=$with_openh264
 		  	OPENH264_CFLAGS="-I$OPENH264_PREFIX/include"
-			OPENH264_LDFLAGS="-L$OPENH264_PREFIX/lib" 
+			OPENH264_LDFLAGS="-L$OPENH264_PREFIX/lib"
 			AC_MSG_RESULT([Using OpenH264 prefix... $with_openh264])
 		  else
 		  	OPENH264_CFLAGS=""
-			OPENH264_LDFLAGS="" 
+			OPENH264_LDFLAGS=""
 		  fi
 
 		  AC_MSG_CHECKING([OpenH264 usability])
 
 		  OPENH264_LIBS="-lopenh264 -lstdc++"
-		  
+
 		  SAVED_LIBS="$LIBS"
 		  SAVED_LDFLAGS="$LDFLAGS"
 		  SAVED_CFLAGS="$CFLAGS"
-		  
+
 		  LIBS="$OPENH264_LIBS $LIBS"
 		  LDFLAGS="$OPENH264_LDFLAGS $LDFLAGS"
 		  CFLAGS="$OPENH264_CFLAGS $CFLAGS"
-		  
+
 		  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <wels/codec_api.h>
 		                                    #include <wels/codec_app_def.h>
 					          ]],
@@ -1325,25 +1331,25 @@ AC_ARG_ENABLE(vpx,
 		  if test "x$with_vpx" != "xno" -a "x$with_vpx" != "x"; then
 		        VPX_PREFIX=$with_vpx
 		  	VPX_CFLAGS="-I$VPX_PREFIX/include"
-			VPX_LDFLAGS="-L$VPX_PREFIX/lib" 
+			VPX_LDFLAGS="-L$VPX_PREFIX/lib"
 			AC_MSG_RESULT([Using VPX prefix... $with_vpx])
 		  else
 		  	VPX_CFLAGS=""
-			VPX_LDFLAGS="" 
+			VPX_LDFLAGS=""
 		  fi
 
 		  AC_MSG_CHECKING([VPX usability])
 
 		  VPX_LIBS="-lvpx"
-		  
+
 		  SAVED_LIBS="$LIBS"
 		  SAVED_LDFLAGS="$LDFLAGS"
 		  SAVED_CFLAGS="$CFLAGS"
-		  
+
 		  LIBS="$VPX_LIBS $LIBS"
 		  LDFLAGS="$VPX_LDFLAGS $LDFLAGS"
 		  CFLAGS="$VPX_CFLAGS $CFLAGS"
-		  
+
 		  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <vpx/vpx_encoder.h>
 						    #include <vpx/vp8cx.h>
 					          ]],
@@ -1395,7 +1401,7 @@ AC_ARG_WITH(ipp-arch,
     )
 
 if test "x$enable_ipp" != "xno"; then
-    dnl # 
+    dnl #
     dnl # Verifying Intel IPP path
     dnl #
     AC_MSG_CHECKING([Intel IPP location])
@@ -1440,7 +1446,7 @@ if test "x$enable_ipp" != "xno"; then
 
 #
 	# Some differences between Mac OS X and Linux
-	case $target in 
+	case $target in
 	    *darwin* )
 		IPP_LDFLAGS="-L$IPPROOT/Libraries -L$IPPROOT/lib"
 		;;
@@ -1492,7 +1498,7 @@ if test "x$enable_ipp" != "xno"; then
 	LIBS="$SAVED_LIBS"
     fi
 
-    dnl # 
+    dnl #
     dnl # Verifying Intel IPP samples path
     dnl #
     AC_MSG_CHECKING([Intel IPP samples location])
@@ -1518,11 +1524,11 @@ if test "x$enable_ipp" != "xno"; then
     else
 	# Remove trailing backslash
 	IPPSAMPLES=`echo $IPPSAMPLES | sed 's/\/$//'`
-	
+
 	# Guess the libusc.a/libspeech.a build location
 	AC_MSG_CHECKING([Intel IPP USC build location])
 	if test -d $IPPSAMPLES/speech-codecs/bin; then
-	    IPPVER=5 
+	    IPPVER=5
 	    IPPSAMP_DIR=`ls -d $IPPSAMPLES/speech-codecs/bin/*gcc*/lib | head -1`
 	elif test -d $IPPSAMPLES/speech-codecs/_bin; then
 	    IPPVER=6
@@ -1695,10 +1701,10 @@ AC_ARG_ENABLE(ssl,
 		    AC_CHECK_LIB(ssl,SSL_CTX_new,[libssl_present=1 && LIBS="-lssl $LIBS"])
 		    if test "x$openssl_h_present" = "x1" -a "x$libssl_present" = "x1" -a "x$libcrypto_present" = "x1"; then
 	        	AC_MSG_RESULT([OpenSSL library found, SSL support enabled])
-			
+
 			# Check if SRTP should be compiled with OpenSSL
 			# support, to enable cryptos such as AES GCM.
-			
+
 			# EVP_CIPHER_CTX is now opaque in OpenSSL 1.1.0, libsrtp 1.5.4 uses it as a transparent type.
 			# Update 2.7: our bundled libsrtp has been upgraded to 2.1.0,
 			# so we can omit EVP_CIPHER_CTX definition check now.
@@ -1721,9 +1727,9 @@ AC_ARG_ENABLE(ssl,
 		    else
 			AC_MSG_RESULT([** OpenSSL libraries not found **])
 		    fi
-		
+
 		fi
-		
+
     		if test "x$ac_ssl_backend" = "x"; then
 
 		    if test "x$with_gnutls" != "xno" -a "x$with_gnutls" != "x"; then
@@ -1762,7 +1768,7 @@ AC_ARG_ENABLE(ssl,
         	    else
             		AC_MSG_RESULT([** No GnuTLS libraries found, disabling SSL support **])
         	    fi
-        	
+
         	fi
 	      ])
 
@@ -1893,7 +1899,7 @@ AC_ARG_ENABLE(silk,
                     CPPFLAGS="$CPPFLAGS -I$with_silk/interface"
                     LDFLAGS="$LDFLAGS -L$with_silk"
                     AC_MSG_RESULT([Using SILK prefix... $with_silk])
-                fi                
+                fi
 		AC_SUBST(silk_h_present)
 		AC_SUBST(silk_present)
 		AC_CHECK_HEADER(SKP_Silk_SDK_API.h,[silk_h_present=1])
@@ -1984,31 +1990,31 @@ AC_ARG_ENABLE(bcg729,
 		  if test "x$with_bcg729" != "xno" -a "x$with_bcg729" != "x"; then
 		        BCG729_PREFIX=$with_bcg729
 		  	BCG729_CFLAGS="-I$BCG729_PREFIX/include"
-			BCG729_LDFLAGS="-L$BCG729_PREFIX/lib" 
+			BCG729_LDFLAGS="-L$BCG729_PREFIX/lib"
 			AC_MSG_RESULT([Using bcg729 prefix... $with_bcg729])
 		  else
 		  	BCG729_CFLAGS=""
-			BCG729_LDFLAGS="" 
+			BCG729_LDFLAGS=""
 		  fi
 
 		  AC_MSG_CHECKING([bcg729 usability])
 
 		  BCG729_LIBS="-lbcg729"
-		  
+
 		  SAVED_LIBS="$LIBS"
 		  SAVED_LDFLAGS="$LDFLAGS"
 		  SAVED_CFLAGS="$CFLAGS"
-		  
+
 		  LIBS="$BCG729_LIBS $LIBS"
 		  LDFLAGS="$BCG729_LDFLAGS $LDFLAGS"
 		  CFLAGS="$BCG729_CFLAGS $CFLAGS"
-		  
+
 		  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <bcg729/encoder.h>
 		                                    #include <bcg729/decoder.h>
 					          ]],
 					          [initBcg729EncoderChannel(0);]
 					         )],
-		  		 [ 
+		  		 [
 				   AC_DEFINE(PJMEDIA_HAS_BCG729,1)
 		  		   AC_MSG_RESULT(ok)
 		  		  ],
@@ -2022,7 +2028,7 @@ AC_ARG_ENABLE(bcg729,
 		  		 ])
 
 	      ])
-		  
+
 
 dnl # Include libyuv
 AC_SUBST(ac_no_yuv)
@@ -2112,7 +2118,7 @@ AC_ARG_ENABLE(libwebrtc,
 			;;
 		     *)
 			;;
-		esac	
+		esac
 	      ])
 
 
@@ -2211,4 +2217,3 @@ Further customizations can be put in:
 
 The next step now is to run 'make dep' and 'make'.
 ])
-

@@ -9,7 +9,7 @@ MY_MODULES      := $(MY_MODULE_PATH)/pjsua_app.o \
 		   $(MY_MODULE_PATH)/pjsua_app_legacy.o
 
 OUT_DIR		:= ../build/jni
-LIBPJSUA_SO	:= ../app/src/main/jniLibs/armeabi/libpjsua.so
+LIBPJSUA_SO	:= ../app/src/main/jniLibs/$(TARGET_ARCH)/libpjsua.so
 
 # Env settings, e.g: path to SWIG, JDK, java(.exe), javac(.exe)
 MY_SWIG		:= swig
@@ -26,7 +26,9 @@ MY_PACKAGE_PATH := ../app/src/main/java/$(subst .,/,$(MY_PACKAGE_NAME))
 all: $(LIBPJSUA_SO) java
 
 $(LIBPJSUA_SO): $(OUT_DIR)/pjsua_wrap.o
-	mkdir -p ../app/src/main/jniLibs/armeabi
+	mkdir -p ../app/src/main/jniLibs/$(TARGET_ARCH)
+	# copy libc++_shared.so manually
+	cp -f ${ANDROID_NDK_ROOT}/sources/cxx-stl/llvm-libc++/libs/${TARGET_ARCH}/libc++_shared.so ../app/src/main/jniLibs/$(TARGET_ARCH)	
 	$(PJ_CXX) -shared -o $(LIBPJSUA_SO) \
 	$(OUT_DIR)/pjsua_wrap.o $(OUT_DIR)/pjsua_app_callback.o \
 	$(MY_MODULES) \
