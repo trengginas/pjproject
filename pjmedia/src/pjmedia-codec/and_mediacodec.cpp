@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <pjmedia-codec/and_mediacodec.h> 
+#include <pjmedia-codec/and_mediacodec.h>
 #include <pjmedia-codec/h264_packetizer.h>
 #include <pjmedia/vid_codec_util.h>
 #include <pjmedia/errno.h>
@@ -38,6 +38,7 @@
  * Constants
  */
 #define THIS_FILE		"and_mediacodec.cpp"
+#define ANMED_H264_CODEC_TYPE   "video/avc"
 
 #  define DEFAULT_WIDTH		352
 #  define DEFAULT_HEIGHT	288
@@ -138,22 +139,17 @@ typedef struct anmed_codec_data
     pjmedia_h264_packetizer	*pktz;
 
     /* Encoder state */
+    AMediaCodec                 *enc;
     unsigned		 	 enc_input_size;
     pj_uint8_t			*enc_frame_whole;
     unsigned			 enc_frame_size;
     unsigned			 enc_processed;
-    pj_timestamp		 ets;
-    int			 	 ilayer;
 
     /* Decoder state */
+    AMediaCodec                 *dec;
     pj_uint8_t			*dec_buf;
     unsigned			 dec_buf_size;
 } anmed_codec_data;
-
-static void log_print(void* ctx, int level, const char* string) {
-    PJ_UNUSED_ARG(ctx);
-    PJ_LOG(4,("[AMediaCodec_LOG]", "[L%d] %s", level, string));
-}
 
 PJ_DEF(pj_status_t) pjmedia_codec_anmed_vid_init(pjmedia_vid_codec_mgr *mgr,
                                                  pj_pool_factory *pf)
@@ -169,7 +165,7 @@ PJ_DEF(pj_status_t) pjmedia_codec_anmed_vid_init(pjmedia_vid_codec_mgr *mgr,
     if (!mgr) mgr = pjmedia_vid_codec_mgr_instance();
     PJ_ASSERT_RETURN(mgr, PJ_EINVAL);
 
-    /* Create OpenH264 codec factory. */
+    /* Create Android AMediaCodec codec factory. */
     anmed_factory.base.op = &anmed_factory_op;
     anmed_factory.base.factory_data = NULL;
     anmed_factory.mgr = mgr;
@@ -305,7 +301,6 @@ static pj_status_t anmed_enum_info(pjmedia_vid_codec_factory *factory,
     info->fps[2].denum = 1;
 
     return PJ_SUCCESS;
-
 }
 
 static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
@@ -339,10 +334,15 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     codec->codec_data = anmed_data;
 
     /* encoder allocation */
-    medCodec = AMediaCodec_createDecoderByType("video/avc");
-    if (medCodec)
-        AMediaCodec_delete(medCodec);
+    anmed_data->enc = AMediaCodec_createEncoderByType(ANMED_H264_CODEC_TYPE);
+    if (!anmed_data->enc)
+        goto on_error;
 
+    anmed_data->dec = AMediaCodec_createDecoderByType(ANMED_H264_CODEC_TYPE);
+    if (!!anmed_data->dec)
+        goto on_error;
+
+    *pcodec = codec;
     return PJ_SUCCESS;
 
 on_error:
@@ -359,6 +359,16 @@ static pj_status_t anmed_dealloc_codec(pjmedia_vid_codec_factory *factory,
 
     PJ_UNUSED_ARG(factory);
 
+    anmed_data = (anmed_codec_data*) codec->codec_data;
+    if (anmed_data->enc) {
+        AMediaCodec_delete(anmed_data->enc);
+        anmed_data->enc = NULL;
+    }
+
+    if (anmed_data->dec) {
+        AMediaCodec_delete(anmed_data->dec);
+        anmed_data->dec = NULL;
+    }
     pj_pool_release(anmed_data->pool);
     return PJ_SUCCESS;
 }
@@ -375,6 +385,48 @@ static pj_status_t anmed_codec_init(pjmedia_vid_codec *codec,
 static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
                                     pjmedia_vid_codec_param *codec_param )
 {
+    anmed_codec_data *anmed_data;
+    pjmedia_vid_codec_param	*param;
+    pjmedia_h264_packetizer_cfg  pktz_cfg;
+    pjmedia_vid_codec_h264_fmtp  h264_fmtp;
+
+    PJ_LOG(5,(THIS_FILE, "Opening codec.."));
+
+    anmed_data = (anmed_codec_data*) codec->codec_data;
+    anmed_data->prm = pjmedia_vid_codec_param_clone( anmed_data->pool,
+                                                     codec_param);
+    param = anmed_data->prm;
+
+    /* Parse remote fmtp */
+    pj_bzero(&h264_fmtp, sizeof(h264_fmtp));
+    status = pjmedia_vid_codec_h264_parse_fmtp(&param->enc_fmtp, &h264_fmtp);
+    if (status != PJ_SUCCESS)
+	return status;
+
+    /* Apply SDP fmtp to format in codec param */
+    if (!param->ignore_fmtp) {
+	status = pjmedia_vid_codec_h264_apply_fmtp(param);
+	if (status != PJ_SUCCESS)
+	    return status;
+    }
+    pj_bzero(&pktz_cfg, sizeof(pktz_cfg));
+    pktz_cfg.mtu = param->enc_mtu;
+    pktz_cfg.unpack_nal_start = 4;
+    /* Packetization mode */
+    if (h264_fmtp.packetization_mode == 0)
+	pktz_cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_SINGLE_NAL;
+    else if (h264_fmtp.packetization_mode == 1)
+	pktz_cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
+    else
+	return PJ_ENOTSUP;
+
+    status = pjmedia_h264_packetizer_create(anmed_data->pool, &pktz_cfg,
+                                            &anmed_data->pktz);
+    if (status != PJ_SUCCESS)
+        return status;
+
+    anmed_data->whole = (param->packing == PJMEDIA_VID_PACKING_WHOLE);
+
     return PJ_SUCCESS;
 }
 
