@@ -39,6 +39,12 @@
  */
 #define THIS_FILE		"and_mediacodec.cpp"
 #define ANMED_H264_CODEC_TYPE   "video/avc"
+#define ANMED_KEY_COLOR_FMT     "color-format"
+#define ANMED_KEY_WIDTH         "width"
+#define ANMED_KEY_HEIGHT        "height"
+#define ANMED_KEY_BIT_RATE      "bitrate"
+#define ANMED_KEY_FRAME_RATE    "frame-rate"
+#define ANMED_COLOR_FMT         0x00000013
 
 #  define DEFAULT_WIDTH		352
 #  define DEFAULT_HEIGHT	288
@@ -389,6 +395,8 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     pjmedia_vid_codec_param	*param;
     pjmedia_h264_packetizer_cfg  pktz_cfg;
     pjmedia_vid_codec_h264_fmtp  h264_fmtp;
+    media_status_t am_status;
+    AMediaFormat *vid_fmt = NULL;
 
     PJ_LOG(5,(THIS_FILE, "Opening codec.."));
 
@@ -411,7 +419,6 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     }
     pj_bzero(&pktz_cfg, sizeof(pktz_cfg));
     pktz_cfg.mtu = param->enc_mtu;
-    pktz_cfg.unpack_nal_start = 4;
     /* Packetization mode */
     if (h264_fmtp.packetization_mode == 0)
 	pktz_cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_SINGLE_NAL;
@@ -426,6 +433,45 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         return status;
 
     anmed_data->whole = (param->packing == PJMEDIA_VID_PACKING_WHOLE);
+
+    /*
+     * Configure encoder.
+     */
+    vid_fmt = AMediaFormat_new();
+    if (!vid_fmt) {
+        return PJ_ENOMEM;
+    }
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_BIT_RATE,
+                          param->enc_fmt.det.vid.avg_bps;);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
+                          (param->enc_fmt.det.vid.fps.num /
+    			   param->enc_fmt.det.vid.fps.denum));
+    am_status = AMediaCodec_configure(anmed_data->enc, vid_fmt, NULL, NULL, 0);
+    AMediaFormat_delete(vid_fmt);
+    if (am_status != AMEDIA_OK) {
+        PJ_LOG(4,(THIS_FILE, "Encoder configure failed, status=%d", am_status));
+        return PJMEDIA_CODEC_EFAILED;
+    }
+
+    /*
+     * Configure decoder.
+     */
+    vid_fmt = AMediaFormat_new();
+    if (!vid_fmt) {
+        return PJ_ENOMEM;
+    }
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
+                          (param->enc_fmt.det.vid.fps.num /
+                           param->enc_fmt.det.vid.fps.denum));
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
+
+    am_status = AMediaCodec_configure(anmed_data->dec, vid_fmt, NULL, NULL, 0);
+    AMediaFormat_delete(vid_fmt);
+    if (am_status != AMEDIA_OK) {
+        PJ_LOG(4,(THIS_FILE, "Decoder configure failed, status=%d", am_status));
+        return PJMEDIA_CODEC_EFAILED;
+    }
 
     return PJ_SUCCESS;
 }
