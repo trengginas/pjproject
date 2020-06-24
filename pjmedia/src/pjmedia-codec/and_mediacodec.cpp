@@ -348,7 +348,7 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     if (!!anmed_data->dec)
         goto on_error;
 
-    *pcodec = codec;
+    *p_codec = codec;
     return PJ_SUCCESS;
 
 on_error:
@@ -395,6 +395,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     pjmedia_vid_codec_param	*param;
     pjmedia_h264_packetizer_cfg  pktz_cfg;
     pjmedia_vid_codec_h264_fmtp  h264_fmtp;
+    pj_status_t status;
     media_status_t am_status;
     AMediaFormat *vid_fmt = NULL;
 
@@ -443,7 +444,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     }
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_BIT_RATE,
-                          param->enc_fmt.det.vid.avg_bps;);
+                          param->enc_fmt.det.vid.avg_bps);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
                           (param->enc_fmt.det.vid.fps.num /
     			   param->enc_fmt.det.vid.fps.denum));
@@ -513,7 +514,6 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
                                             pj_bool_t *has_more)
 {
     struct anmed_codec_data *anmed_data;
-    int rc;
 
     PJ_ASSERT_RETURN(codec && input && out_size && output && has_more,
                      PJ_EINVAL);
