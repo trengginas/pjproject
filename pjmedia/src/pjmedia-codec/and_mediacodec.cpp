@@ -22,9 +22,9 @@
 #include <pjmedia/errno.h>
 #include <pj/log.h>
 
-#if defined(PJMEDIA_HAS_ANDROID_MEDIACODEC) && \
-            PJMEDIA_HAS_ANDROID_MEDIACODEC != 0 && \
-    defined(PJMEDIA_HAS_VIDEO) && (PJMEDIA_HAS_VIDEO != 0)
+//#if defined(PJMEDIA_HAS_ANDROID_MEDIACODEC) && \
+//            PJMEDIA_HAS_ANDROID_MEDIACODEC != 0 && \
+//    defined(PJMEDIA_HAS_VIDEO) && (PJMEDIA_HAS_VIDEO != 0)
 
 /* Android AMediaCodec: */
 #include "media/NdkMediaCodec.h"
@@ -45,6 +45,7 @@
 #define ANMED_KEY_BIT_RATE      "bitrate"
 #define ANMED_KEY_FRAME_RATE    "frame-rate"
 #define ANMED_COLOR_FMT         0x00000013
+#define ANMED_QUEUE_TIMEOUT     2000*100
 
 #  define DEFAULT_WIDTH		352
 #  define DEFAULT_HEIGHT	288
@@ -143,6 +144,7 @@ typedef struct anmed_codec_data
     pjmedia_vid_codec_param	*prm;
     pj_bool_t			 whole;
     pjmedia_h264_packetizer	*pktz;
+    pj_bool_t                    codec_started;
 
     /* Encoder state */
     AMediaCodec                 *enc;
@@ -367,14 +369,17 @@ static pj_status_t anmed_dealloc_codec(pjmedia_vid_codec_factory *factory,
 
     anmed_data = (anmed_codec_data*) codec->codec_data;
     if (anmed_data->enc) {
+        AMediaCodec_stop(anmed_data->enc);
         AMediaCodec_delete(anmed_data->enc);
         anmed_data->enc = NULL;
     }
 
     if (anmed_data->dec) {
+        AMediaCodec_stop(anmed_data->dec);
         AMediaCodec_delete(anmed_data->dec);
         anmed_data->dec = NULL;
     }
+    anmed_data->codec_started = PJ_FALSE;
     pj_pool_release(anmed_data->pool);
     return PJ_SUCCESS;
 }
@@ -454,6 +459,11 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         PJ_LOG(4,(THIS_FILE, "Encoder configure failed, status=%d", am_status));
         return PJMEDIA_CODEC_EFAILED;
     }
+    am_status = AMediaCodec_start(anmed_data->enc);
+    if (am_status != AMEDIA_OK) {
+        PJ_LOG(4,(THIS_FILE, "Encoder start failed, status=%d", am_status));
+        return PJMEDIA_CODEC_EFAILED;
+    }
 
     /*
      * Configure decoder.
@@ -473,7 +483,18 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         PJ_LOG(4,(THIS_FILE, "Decoder configure failed, status=%d", am_status));
         return PJMEDIA_CODEC_EFAILED;
     }
+    am_status = AMediaCodec_start(anmed_data->dec);
+    if (am_status != AMEDIA_OK) {
+        PJ_LOG(4,(THIS_FILE, "Decoder start failed, status=%d", am_status));
+        return PJMEDIA_CODEC_EFAILED;
+    }
 
+    anmed_data->dec_buf_size = (MAX_RX_WIDTH * MAX_RX_HEIGHT * 3 >> 1) +
+			       (MAX_RX_WIDTH);
+    anmed_data->dec_buf = (pj_uint8_t*)pj_pool_alloc(anmed_data->pool,
+                                                     anmed_data->dec_buf_size);
+
+    anmed_data->codec_started = PJ_TRUE;
     return PJ_SUCCESS;
 }
 
@@ -589,6 +610,91 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
                                       unsigned out_size,
                                       pjmedia_frame *output)
 {
+    struct anmed_codec_data *anmed_data;
+    unsigned buf_pos, whole_len = 0;
+    unsigned i, frm_cnt;
+    int wait_times = 5;
+    AMediaCodec *dec;
+
+    PJ_ASSERT_RETURN(codec && count && packets && out_size && output,
+                     PJ_EINVAL);
+    PJ_ASSERT_RETURN(output->buf, PJ_EINVAL);
+
+    anmed_data = (anmed_codec_data*) codec->codec_data;
+    dec = anmed_data->dec;
+    /*
+     * Step 1: unpacketize the packets/frames
+     */
+    whole_len = 0;
+    if (anmed_data->whole) {
+	for (i=0; i<count; ++i) {
+	    if (whole_len + packets[i].size > anmed_data->dec_buf_size) {
+		PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow"));
+		status = PJMEDIA_CODEC_EFRMTOOSHORT;
+		break;
+	    }
+
+	    pj_memcpy( anmed_data->dec_buf + whole_len,
+	               (pj_uint8_t*)packets[i].buf,
+	               packets[i].size);
+	    whole_len += packets[i].size;
+	}
+
+    } else {
+	for (i=0; i<count; ++i) {
+	    if (whole_len + packets[i].size + code_size >
+		anmed_data->dec_buf_size)
+	    {
+		PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow [1]"));
+		status = PJMEDIA_CODEC_EFRMTOOSHORT;
+		break;
+	    }
+
+	    status = pjmedia_h264_unpacketize( anmed_data->pktz,
+					       (pj_uint8_t*)packets[i].buf,
+					       packets[i].size,
+					       anmed_data->dec_buf,
+					       anmed_data->dec_buf_size,
+					       &whole_len);
+	    if (status != PJ_SUCCESS) {
+		PJ_PERROR(4,(THIS_FILE, status, "Unpacketize error"));
+		continue;
+	    }
+	}
+    }
+
+    /* Dummy NAL sentinel */
+    pj_memcpy( anmed_data->dec_buf + whole_len, nal_start, sizeof(nal_start));
+
+    /*
+     * Step 2: parse the individual NAL and give to decoder
+     */
+    buf_pos = 0;
+    for (frm_cnt = 0; ; ++frm_cnt) {
+
+    }
+
+    do {
+        pj_size_t idx = AMediaCodec_dequeueInputBuffer(dec, 
+                                                       ANMED_QUEUE_TIMEOUT);
+        if (idx >= 0) {
+            pj_size_t out_size;
+            uint8_t *inputBuf = AMediaCodec_getInputBuffer(dec, idx,
+                                                           &out_size);
+            if (inputBuf != NULL && anmed_data->dec_buf_size <= outSize) {
+                memcpy(inputBuf, frame, frameLen);
+                media_status_t status = AMediaCodec_queueInputBuffer(dec,
+                                                  bufIdx, 0, frameLen, 2000, 0);
+            } else {
+                
+            }
+            break;
+        } else {
+            pj_thread_sleep(10);
+        }
+    } while (--times > 0)
+
+
     return PJ_SUCCESS;
 }
 
