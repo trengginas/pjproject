@@ -244,6 +244,7 @@ static pj_status_t anmed_test_alloc(pjmedia_vid_codec_factory *factory,
     if (info->fmt_id == PJMEDIA_FORMAT_H264 &&
 	info->pt != 0)
     {
+        PJ_LOG(4,(THIS_FILE, "test alloc .. codec supported, return %d", PJ_SUCCESS));
 	return PJ_SUCCESS;
     }
 
