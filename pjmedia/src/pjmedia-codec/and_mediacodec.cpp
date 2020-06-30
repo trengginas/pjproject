@@ -457,8 +457,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     if (!vid_fmt) {
         return PJ_ENOMEM;
     }
-    AMediaFormat_setString(vid_fmt, ANMED_KEY_COLOR_FMT,
-                           ANMED_H264_CODEC_TYPE);
+    AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_H264_CODEC_TYPE);
     //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
     //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_BIT_RATE,
     //                      param->enc_fmt.det.vid.avg_bps);
