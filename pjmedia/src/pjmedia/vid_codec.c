@@ -563,22 +563,24 @@ PJ_DEF(pj_status_t) pjmedia_vid_codec_mgr_alloc_codec(
 
     pj_mutex_lock(mgr->mutex);
 
+    PJ_LOG(4,(THIS_FILE, "alloc_codec .. codec %.*s", info->encoding_name.slen, info->encoding_name.ptr));
     factory = mgr->factory_list.next;
     while (factory != &mgr->factory_list) {
-
+        
 	if ( (*factory->op->test_alloc)(factory, info) == PJ_SUCCESS ) {
-
 	    status = (*factory->op->alloc_codec)(factory, info, p_codec);
 	    if (status == PJ_SUCCESS) {
+                PJ_LOG(4,(THIS_FILE, "alloc_codec .. found factory"));
 		pj_mutex_unlock(mgr->mutex);
 		return PJ_SUCCESS;
 	    }
 
 	}
+        PJ_LOG(4,(THIS_FILE, "alloc_codec .. next factory"));
 
 	factory = factory->next;
     }
-
+    PJ_LOG(4,(THIS_FILE, "alloc_codec .. not found factory for codec %.*s", info->encoding_name.slen, info->encoding_name.ptr));
     pj_mutex_unlock(mgr->mutex);
 
     return PJMEDIA_CODEC_EUNSUP;
