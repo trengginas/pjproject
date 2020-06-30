@@ -239,6 +239,8 @@ static pj_status_t anmed_test_alloc(pjmedia_vid_codec_factory *factory,
 {
     PJ_ASSERT_RETURN(factory == &anmed_factory.base, PJ_EINVAL);
 
+    PJ_LOG(5,(THIS_FILE, "test alloc .. fmt_id=%d, pt=%d", info->fmt_id, info->pt));
+
     if (info->fmt_id == PJMEDIA_FORMAT_H264 &&
 	info->pt != 0)
     {
