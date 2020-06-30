@@ -458,15 +458,19 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         return PJ_ENOMEM;
     }
     AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_H264_CODEC_TYPE);
-    //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
-    //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_BIT_RATE,
-    //                      param->enc_fmt.det.vid.avg_bps);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_HEIGHT,
+                          param->enc_fmt.det.vid.size.h);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_WIDTH,
+                          param->enc_fmt.det.vid.size.w);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_BIT_RATE,
+                          param->enc_fmt.det.vid.avg_bps);
     /* Base profile */
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_PROFILE, 1);
-    //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_IFR_INTTERVAL, KEYFRAME_INTERVAL);
-    //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
-    //                      (param->enc_fmt.det.vid.fps.num /
-    //			   param->enc_fmt.det.vid.fps.denum));
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_IFR_INTTERVAL, KEYFRAME_INTERVAL);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
+                          (param->enc_fmt.det.vid.fps.num /
+    			   param->enc_fmt.det.vid.fps.denum));
 
     /* Configure as encoder. */
     am_status = AMediaCodec_configure(anmed_data->enc, vid_fmt, NULL, NULL,
