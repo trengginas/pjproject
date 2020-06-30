@@ -46,6 +46,7 @@
 #define ANMED_KEY_PROFILE       "profile"
 #define ANMED_KEY_FRAME_RATE    "frame-rate"
 #define ANMED_KEY_IFR_INTTERVAL "i-frame-interval"
+#define ANMED_KEY_MIME          "mime"
 #define ANMED_COLOR_FMT         0x7f420888 /* YUV420Flexible */
 #define ANMED_QUEUE_TIMEOUT     2000*100
 
@@ -456,11 +457,13 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     if (!vid_fmt) {
         return PJ_ENOMEM;
     }
-    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
+    AMediaFormat_setString(vid_fmt, ANMED_KEY_COLOR_FMT,
+                           ANMED_H264_CODEC_TYPE);
+    //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
     //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_BIT_RATE,
     //                      param->enc_fmt.det.vid.avg_bps);
-    ///* Base profile */
-    //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_PROFILE, 1);
+    /* Base profile */
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_PROFILE, 1);
     //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_IFR_INTTERVAL, KEYFRAME_INTERVAL);
     //AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
     //                      (param->enc_fmt.det.vid.fps.num /
