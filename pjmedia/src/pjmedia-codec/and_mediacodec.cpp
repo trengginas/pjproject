@@ -238,17 +238,13 @@ static pj_status_t anmed_test_alloc(pjmedia_vid_codec_factory *factory,
                                     const pjmedia_vid_codec_info *info )
 {
     PJ_ASSERT_RETURN(factory == &anmed_factory.base, PJ_EINVAL);
-
-    PJ_LOG(4,(THIS_FILE, "test alloc .. fmt_id=%d, pt=%d", info->fmt_id, info->pt));
+    
 
     if (info->fmt_id == PJMEDIA_FORMAT_H264 &&
 	info->pt != 0)
     {
-        PJ_LOG(4,(THIS_FILE, "test alloc .. codec supported, return %d", PJ_SUCCESS));
 	return PJ_SUCCESS;
-    }
-
-    PJ_LOG(4,(THIS_FILE, "test alloc .. codec not supported"));
+    }    
 
     return PJMEDIA_CODEC_EUNSUP;
 }
@@ -349,14 +345,19 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     anmed_data->pool = pool;
     codec->codec_data = anmed_data;
 
-    /* encoder allocation */
+    PJ_LOG(4,(THIS_FILE, "alloc_codec .. creating encoder"));
     anmed_data->enc = AMediaCodec_createEncoderByType(ANMED_H264_CODEC_TYPE);
-    if (!anmed_data->enc)
+    if (!anmed_data->enc) {
+        PJ_LOG(4,(THIS_FILE, "alloc_codec .. failed creating encoder"));
         goto on_error;
+    }
 
+    PJ_LOG(4,(THIS_FILE, "alloc_codec .. creating decoder"));
     anmed_data->dec = AMediaCodec_createDecoderByType(ANMED_H264_CODEC_TYPE);
-    if (!!anmed_data->dec)
+    if (!anmed_data->dec) {
+        PJ_LOG(4,(THIS_FILE, "alloc_codec .. failed creating decoder"));
         goto on_error;
+    }
 
     *p_codec = codec;
     return PJ_SUCCESS;
