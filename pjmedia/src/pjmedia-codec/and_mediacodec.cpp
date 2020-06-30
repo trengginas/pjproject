@@ -46,7 +46,7 @@
 #define ANMED_KEY_PROFILE       "profile"
 #define ANMED_KEY_FRAME_RATE    "frame-rate"
 #define ANMED_KEY_IFR_INTTERVAL "i-frame-interval"
-#define ANMED_COLOR_FMT         0x00000013
+#define ANMED_COLOR_FMT         0x7f420888 /* YUV420Flexible */
 #define ANMED_QUEUE_TIMEOUT     2000*100
 
 #define DEFAULT_WIDTH		352
