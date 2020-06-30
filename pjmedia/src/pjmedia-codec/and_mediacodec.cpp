@@ -247,6 +247,8 @@ static pj_status_t anmed_test_alloc(pjmedia_vid_codec_factory *factory,
 	return PJ_SUCCESS;
     }
 
+    PJ_LOG(4,(THIS_FILE, "test alloc .. codec not supported"));
+
     return PJMEDIA_CODEC_EUNSUP;
 }
 
