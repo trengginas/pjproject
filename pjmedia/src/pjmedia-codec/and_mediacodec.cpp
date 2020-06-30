@@ -323,8 +323,6 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     pj_pool_t *pool;
     pjmedia_vid_codec *codec;
     anmed_codec_data *anmed_data;
-    int rc;
-    AMediaCodec *medCodec;
     int log_level = 5;
 
     PJ_ASSERT_RETURN(factory == &anmed_factory.base && info && p_codec,
@@ -625,6 +623,7 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
     struct anmed_codec_data *anmed_data;
     unsigned buf_pos, whole_len = 0;
     unsigned i, frm_cnt;
+    pj_status_t status;
     int wait_times = 5;
     AMediaCodec *dec;
 
@@ -634,77 +633,77 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
 
     anmed_data = (anmed_codec_data*) codec->codec_data;
     dec = anmed_data->dec;
-    /*
-     * Step 1: unpacketize the packets/frames
-     */
-    whole_len = 0;
-    if (anmed_data->whole) {
-	for (i=0; i<count; ++i) {
-	    if (whole_len + packets[i].size > anmed_data->dec_buf_size) {
-		PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow"));
-		status = PJMEDIA_CODEC_EFRMTOOSHORT;
-		break;
-	    }
+ //   /*
+ //    * Step 1: unpacketize the packets/frames
+ //    */
+ //   whole_len = 0;
+ //   if (anmed_data->whole) {
+	//for (i=0; i<count; ++i) {
+	//    if (whole_len + packets[i].size > anmed_data->dec_buf_size) {
+	//	PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow"));
+	//	status = PJMEDIA_CODEC_EFRMTOOSHORT;
+	//	break;
+	//    }
 
-	    pj_memcpy( anmed_data->dec_buf + whole_len,
-	               (pj_uint8_t*)packets[i].buf,
-	               packets[i].size);
-	    whole_len += packets[i].size;
-	}
+	//    pj_memcpy( anmed_data->dec_buf + whole_len,
+	//               (pj_uint8_t*)packets[i].buf,
+	//               packets[i].size);
+	//    whole_len += packets[i].size;
+	//}
 
-    } else {
-	for (i=0; i<count; ++i) {
-	    if (whole_len + packets[i].size + code_size >
-		anmed_data->dec_buf_size)
-	    {
-		PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow [1]"));
-		status = PJMEDIA_CODEC_EFRMTOOSHORT;
-		break;
-	    }
+ //   } else {
+	//for (i=0; i<count; ++i) {
+	//    if (whole_len + packets[i].size + code_size >
+	//	anmed_data->dec_buf_size)
+	//    {
+	//	PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow [1]"));
+	//	status = PJMEDIA_CODEC_EFRMTOOSHORT;
+	//	break;
+	//    }
 
-	    status = pjmedia_h264_unpacketize( anmed_data->pktz,
-					       (pj_uint8_t*)packets[i].buf,
-					       packets[i].size,
-					       anmed_data->dec_buf,
-					       anmed_data->dec_buf_size,
-					       &whole_len);
-	    if (status != PJ_SUCCESS) {
-		PJ_PERROR(4,(THIS_FILE, status, "Unpacketize error"));
-		continue;
-	    }
-	}
-    }
+	//    status = pjmedia_h264_unpacketize( anmed_data->pktz,
+	//				       (pj_uint8_t*)packets[i].buf,
+	//				       packets[i].size,
+	//				       anmed_data->dec_buf,
+	//				       anmed_data->dec_buf_size,
+	//				       &whole_len);
+	//    if (status != PJ_SUCCESS) {
+	//	PJ_PERROR(4,(THIS_FILE, status, "Unpacketize error"));
+	//	continue;
+	//    }
+	//}
+ //   }
 
-    /* Dummy NAL sentinel */
-    pj_memcpy( anmed_data->dec_buf + whole_len, nal_start, sizeof(nal_start));
+ //   /* Dummy NAL sentinel */
+ //   pj_memcpy( anmed_data->dec_buf + whole_len, nal_start, sizeof(nal_start));
 
-    /*
-     * Step 2: parse the individual NAL and give to decoder
-     */
-    buf_pos = 0;
-    for (frm_cnt = 0; ; ++frm_cnt) {
+ //   /*
+ //    * Step 2: parse the individual NAL and give to decoder
+ //    */
+ //   buf_pos = 0;
+ //   for (frm_cnt = 0; ; ++frm_cnt) {
 
-    }
+ //   }
 
-    do {
-        pj_size_t idx = AMediaCodec_dequeueInputBuffer(dec, 
-                                                       ANMED_QUEUE_TIMEOUT);
-        if (idx >= 0) {
-            pj_size_t out_size;
-            uint8_t *inputBuf = AMediaCodec_getInputBuffer(dec, idx,
-                                                           &out_size);
-            if (inputBuf != NULL && anmed_data->dec_buf_size <= outSize) {
-                memcpy(inputBuf, frame, frameLen);
-                media_status_t status = AMediaCodec_queueInputBuffer(dec,
-                                                  bufIdx, 0, frameLen, 2000, 0);
-            } else {
+ //   do {
+ //       pj_size_t idx = AMediaCodec_dequeueInputBuffer(dec, 
+ //                                                      ANMED_QUEUE_TIMEOUT);
+ //       if (idx >= 0) {
+ //           pj_size_t out_size;
+ //           uint8_t *inputBuf = AMediaCodec_getInputBuffer(dec, idx,
+ //                                                          &out_size);
+ //           if (inputBuf != NULL && anmed_data->dec_buf_size <= outSize) {
+ //               memcpy(inputBuf, frame, frameLen);
+ //               media_status_t status = AMediaCodec_queueInputBuffer(dec,
+ //                                                 bufIdx, 0, frameLen, 2000, 0);
+ //           } else {
 
-            }
-            break;
-        } else {
-            pj_thread_sleep(10);
-        }
-    } while (--times > 0)
+ //           }
+ //           break;
+ //       } else {
+ //           pj_thread_sleep(10);
+ //       }
+ //   } while (--times > 0)
 
 
     return PJ_SUCCESS;
