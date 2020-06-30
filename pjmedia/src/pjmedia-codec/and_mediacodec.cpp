@@ -709,4 +709,4 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
     return PJ_SUCCESS;
 }
 
-#endif	/* PJMEDIA_HAS_ANDROID_MEDIACODEC */
+//#endif	/* PJMEDIA_HAS_ANDROID_MEDIACODEC */
