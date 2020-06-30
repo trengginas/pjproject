@@ -43,12 +43,14 @@
 #define ANMED_KEY_WIDTH         "width"
 #define ANMED_KEY_HEIGHT        "height"
 #define ANMED_KEY_BIT_RATE      "bitrate"
+#define ANMED_KEY_PROFILE       "profile"
 #define ANMED_KEY_FRAME_RATE    "frame-rate"
+#define ANMED_KEY_IFR_INTTERVAL "i-frame-interval"
 #define ANMED_COLOR_FMT         0x00000013
 #define ANMED_QUEUE_TIMEOUT     2000*100
 
-#  define DEFAULT_WIDTH		352
-#  define DEFAULT_HEIGHT	288
+#define DEFAULT_WIDTH		352
+#define DEFAULT_HEIGHT	        288
 
 #define DEFAULT_FPS		15
 #define DEFAULT_AVG_BITRATE	256000
@@ -56,6 +58,9 @@
 
 #define MAX_RX_WIDTH		1200
 #define MAX_RX_HEIGHT		800
+
+/* Maximum duration from one key frame to the next (in seconds). */
+#define KEYFRAME_INTERVAL	5
 
 
 /*
@@ -450,10 +455,16 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_BIT_RATE,
                           param->enc_fmt.det.vid.avg_bps);
+    /* Base profile */
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_PROFILE, 1);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_IFR_INTTERVAL, KEYFRAME_INTERVAL);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
                           (param->enc_fmt.det.vid.fps.num /
     			   param->enc_fmt.det.vid.fps.denum));
-    am_status = AMediaCodec_configure(anmed_data->enc, vid_fmt, NULL, NULL, 0);
+
+    /* Configure as encoder. */
+    am_status = AMediaCodec_configure(anmed_data->enc, vid_fmt, NULL, NULL,
+                                      AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
     AMediaFormat_delete(vid_fmt);
     if (am_status != AMEDIA_OK) {
         PJ_LOG(4,(THIS_FILE, "Encoder configure failed, status=%d", am_status));
@@ -494,6 +505,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     anmed_data->dec_buf = (pj_uint8_t*)pj_pool_alloc(anmed_data->pool,
                                                      anmed_data->dec_buf_size);
 
+    PJ_LOG(4,(THIS_FILE, "AMediaCodec configure done"));
     anmed_data->codec_started = PJ_TRUE;
     return PJ_SUCCESS;
 }
@@ -686,7 +698,7 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
                 media_status_t status = AMediaCodec_queueInputBuffer(dec,
                                                   bufIdx, 0, frameLen, 2000, 0);
             } else {
-                
+
             }
             break;
         } else {
