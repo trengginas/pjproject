@@ -21,6 +21,7 @@
 #include <pjmedia/vid_codec_util.h>
 #include <pjmedia/errno.h>
 #include <pj/log.h>
+#include <jni.h>
 
 //#if defined(PJMEDIA_HAS_ANDROID_MEDIACODEC) && \
 //            PJMEDIA_HAS_ANDROID_MEDIACODEC != 0 && \
@@ -33,6 +34,28 @@
 #if __ANDROID_API__ >=19
 #endif
 */
+
+extern JavaVM *pj_jni_jvm;
+
+static pj_bool_t attach_jvm(JNIEnv **jni_env)
+{
+    if ((*pj_jni_jvm)->GetEnv(pj_jni_jvm, (void **)jni_env,
+                               JNI_VERSION_1_4) < 0)
+    {
+        if ((*pj_jni_jvm)->AttachCurrentThread(pj_jni_jvm, jni_env, NULL) < 0)
+        {
+            jni_env = NULL;
+            return PJ_FALSE;
+        }
+        return PJ_TRUE;
+    }
+
+    return PJ_FALSE;
+}
+
+#define detach_jvm(attached) \
+    if (attached) \
+        (*pj_jni_jvm)->DetachCurrentThread(pj_jni_jvm);
 
 /*
  * Constants
@@ -326,15 +349,104 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     pjmedia_vid_codec *codec;
     anmed_codec_data *anmed_data;
     int log_level = 5;
+    /* JNI stuff. */
+    jclass codec_list_class;
+    jmethodID get_codec_count_method;
+    jmethodID is_encoder_method;
+    jmethodId get_supported_types_method;
+    jthrowable exc;
+    JNIEnv *jni_env = 0;
+    pj_bool_t attached = attach_jvm(&jni_env);
+    int num_codecs;
+    unsigned i;
+    char codec_name[64];
 
-    PJ_ASSERT_RETURN(factory == &anmed_factory.base && info && p_codec,
-                     PJ_EINVAL);
+    //PJ_ASSERT_RETURN(jni_env, PJ_FALSE);
+    //PJ_ASSERT_RETURN(factory == &anmed_factory.base && info && p_codec,
+    //                 PJ_EINVAL);
 
     *p_codec = NULL;
 
     pool = pj_pool_create(anmed_factory.pf, "anmed%p", 512, 512, NULL);
     if (!pool)
 	return PJ_ENOMEM;
+
+    /* Get Codec List Info. */
+    //codec_list_class = (jclass)(*jni_env)->NewGlobalRef(jni_env,
+    //           (*jni_env)->FindClass(jni_env, "android/media/MediaCodecList"));
+    //if (codec_list_class == 0) {
+    //    PJ_LOG(4, (THIS_FILE, "Unable to find media codec list class"));
+    //    goto on_return;
+    //}
+
+    //get_codec_count_method = (*jni_env)->GetStaticMethodID(jni_env,
+    //                                                       codec_list_class,
+    //                                                       "getCodecCount",
+    //                                                       "()V");
+    //if (get_codec_count_method == 0) {
+    //    PJ_LOG(4, (THIS_FILE, "Unable to find media codec list "
+    //               "getCodecCount() method"));
+    //    goto on_error;
+    //}
+
+    //num_codecs = (*jni_env)->CallStaticIntMethod(jni_env,
+    //                                             codec_list_class,
+    //                                             get_codec_count_method);
+
+    //if (num_codecs == 0) {
+    //    PJ_LOG(4, (THIS_FILE, "No codec found"));
+    //    goto on_error;
+    //}
+
+    //for (i=0;i<num_codecs;++i) {
+    //    jobject info = NULL;
+    //    jobject supported_types = NULL;
+    //    jmethodID get_codec_info_at_method;
+    //    jclass codec_info_class;
+    //    unsigned j;
+    //    unsigned num_types;
+
+    //    get_codec_info_at_method = (*jni_env)->GetStaticMethodID(jni_env,
+    //                                          codec_list_class,
+    //                                          "getCodecInfoAt",
+    //                                          "(I)Landroid/media/MediaCodecInfo;");
+    //    if (get_codec_info_at_method == 0) {
+    //        PJ_LOG(4, (THIS_FILE, "Unable to find media codec list "
+    //                              "getCodecInfoAt() method"));
+    //        goto on_error;
+    //    }
+    //    info = (*jni_env)->CallObjectMethod(jni_env, codec_list_class,
+    //                                        get_codec_info_at_method, i);
+
+    //    codec_info_class = (*jni_env)->GetObjectClass(jni_env, info);
+
+    //    get_supported_types_method = (*jni_env)->GetMethodID(jni_env,
+    //                                      codec_info_class,
+    //                                      "getSupportedTypes",
+    //                                      "()[Ljava/lang/String;");
+    //    if (get_supported_types_method == 0) {
+    //        PJ_LOG(4, (THIS_FILE, "Unable to find media codec list "
+    //                              "getSupportedTypes() method"));
+    //        goto on_error;
+    //    }
+
+    //    supported_types (*jni_env)->CallObjectMethod(jni_env, info,
+    //                                               get_supported_types_method);
+
+    //    num_types = (*jni_env)->GetArrayLength(jni_env, supported_types);
+
+    //    if (num_types == 0)
+    //        continue;
+
+    //    for (j = 0; j < num_types; ++j) {
+    //        jobject type = (*jni_env)->GetObjectArrayElement(jni_env,
+    //                                                       supported_types, j);
+    //    }
+
+
+    //    info = (*jni_env)->CallStaticObjectMethod(jni_env, codec_list_class,
+    //                                              get_codec_info_at_method, i);
+    //}
 
     /* codec instance */
     codec = PJ_POOL_ZALLOC_T(pool, pjmedia_vid_codec);
@@ -346,19 +458,20 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     anmed_data->pool = pool;
     codec->codec_data = anmed_data;
 
-    PJ_LOG(4,(THIS_FILE, "alloc_codec .. creating encoder"));
     anmed_data->enc = AMediaCodec_createEncoderByType(ANMED_H264_CODEC_TYPE);
     if (!anmed_data->enc) {
         PJ_LOG(4,(THIS_FILE, "alloc_codec .. failed creating encoder"));
         goto on_error;
     }
 
-    PJ_LOG(4,(THIS_FILE, "alloc_codec .. creating decoder"));
+    PJ_LOG(4, (THIS_FILE, "alloc_codec .. created encoder: %s", AMediaCodec_getName(anmed_data->enc, &codec_name)));
+
     anmed_data->dec = AMediaCodec_createDecoderByType(ANMED_H264_CODEC_TYPE);
     if (!anmed_data->dec) {
         PJ_LOG(4,(THIS_FILE, "alloc_codec .. failed creating decoder"));
         goto on_error;
     }
+    PJ_LOG(4, (THIS_FILE, "alloc_codec .. created decoder: %s", AMediaCodec_getName(anmed_data->dec, &codec_name)));
 
     *p_codec = codec;
     return PJ_SUCCESS;
@@ -458,7 +571,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         return PJ_ENOMEM;
     }
     AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_H264_CODEC_TYPE);
-    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, 21);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_HEIGHT,
                           param->enc_fmt.det.vid.size.h);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_WIDTH,
