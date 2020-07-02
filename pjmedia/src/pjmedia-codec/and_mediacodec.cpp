@@ -39,10 +39,9 @@ extern JavaVM *pj_jni_jvm;
 
 static pj_bool_t attach_jvm(JNIEnv **jni_env)
 {
-    if ((*pj_jni_jvm)->GetEnv(pj_jni_jvm, (void **)jni_env,
-                               JNI_VERSION_1_4) < 0)
+    if (pj_jni_jvm->GetEnv((void **)jni_env, JNI_VERSION_1_4) < 0)
     {
-        if ((*pj_jni_jvm)->AttachCurrentThread(pj_jni_jvm, jni_env, NULL) < 0)
+        if (pj_jni_jvm->AttachCurrentThread(jni_env, NULL) < 0)
         {
             jni_env = NULL;
             return PJ_FALSE;
@@ -55,13 +54,15 @@ static pj_bool_t attach_jvm(JNIEnv **jni_env)
 
 #define detach_jvm(attached) \
     if (attached) \
-        (*pj_jni_jvm)->DetachCurrentThread(pj_jni_jvm);
+        pj_jni_jvm->DetachCurrentThread();
 
 /*
  * Constants
  */
 #define THIS_FILE		"and_mediacodec.cpp"
-#define ANMED_H264_CODEC_TYPE   "video/avc"
+#define ANMED_H264_MIME_TYPE    "video/avc"
+#define ANMED_OMX_H264_ENCODER  "OMX.google.h264.encoder"
+#define ANMED_OMX_H264_DECODER  "OMX.google.h264.decoder"
 #define ANMED_KEY_COLOR_FMT     "color-format"
 #define ANMED_KEY_WIDTH         "width"
 #define ANMED_KEY_HEIGHT        "height"
@@ -350,6 +351,7 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     anmed_codec_data *anmed_data;
     int log_level = 5;
     /* JNI stuff. */
+    /*
     jclass codec_list_class;
     jmethodID get_codec_count_method;
     jmethodID is_encoder_method;
@@ -359,11 +361,10 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     pj_bool_t attached = attach_jvm(&jni_env);
     int num_codecs;
     unsigned i;
-    char codec_name[64];
-
+    */
     //PJ_ASSERT_RETURN(jni_env, PJ_FALSE);
-    //PJ_ASSERT_RETURN(factory == &anmed_factory.base && info && p_codec,
-    //                 PJ_EINVAL);
+    PJ_ASSERT_RETURN(factory == &anmed_factory.base && info && p_codec,
+                     PJ_EINVAL);
 
     *p_codec = NULL;
 
@@ -458,20 +459,26 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     anmed_data->pool = pool;
     codec->codec_data = anmed_data;
 
-    anmed_data->enc = AMediaCodec_createEncoderByType(ANMED_H264_CODEC_TYPE);
+    //anmed_data->enc = AMediaCodec_createEncoderByType(ANMED_H264_MIME_TYPE);
+    anmed_data->enc = AMediaCodec_createCodecByName(ANMED_OMX_H264_ENCODER);
     if (!anmed_data->enc) {
-        PJ_LOG(4,(THIS_FILE, "alloc_codec .. failed creating encoder"));
+        PJ_LOG(4,(THIS_FILE, "Failed creating encoder: %s",
+                  ANMED_OMX_H264_ENCODER));
         goto on_error;
     }
 
-    PJ_LOG(4, (THIS_FILE, "alloc_codec .. created encoder: %s", AMediaCodec_getName(anmed_data->enc, &codec_name)));
+    PJ_LOG(4, (THIS_FILE, "Success creating encoder: %s",
+               ANMED_OMX_H264_ENCODER)));
 
-    anmed_data->dec = AMediaCodec_createDecoderByType(ANMED_H264_CODEC_TYPE);
+    //anmed_data->dec = AMediaCodec_createDecoderByType(ANMED_H264_MIME_TYPE);
+    anmed_data->enc = AMediaCodec_createCodecByName(ANMED_OMX_H264_DECODER);
     if (!anmed_data->dec) {
-        PJ_LOG(4,(THIS_FILE, "alloc_codec .. failed creating decoder"));
+        PJ_LOG(4,(THIS_FILE, "Failed creating decoder: %s",
+                  ANMED_OMX_H264_DECODER));
         goto on_error;
     }
-    PJ_LOG(4, (THIS_FILE, "alloc_codec .. created decoder: %s", AMediaCodec_getName(anmed_data->dec, &codec_name)));
+    PJ_LOG(4, (THIS_FILE, "Success creating decoder : %s",
+               ANMED_OMX_H264_DECODER)));
 
     *p_codec = codec;
     return PJ_SUCCESS;
@@ -570,8 +577,8 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     if (!vid_fmt) {
         return PJ_ENOMEM;
     }
-    AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_H264_CODEC_TYPE);
-    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, 21);
+    AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_H264_MIME_TYPE);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_HEIGHT,
                           param->enc_fmt.det.vid.size.h);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_WIDTH,
@@ -585,7 +592,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
                           (param->enc_fmt.det.vid.fps.num /
     			   param->enc_fmt.det.vid.fps.denum));
 
-    /* Configure as encoder. */
+    /* Configure and start encoder. */
     am_status = AMediaCodec_configure(anmed_data->enc, vid_fmt, NULL, NULL,
                                       AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
     AMediaFormat_delete(vid_fmt);
@@ -598,10 +605,9 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         PJ_LOG(4,(THIS_FILE, "Encoder start failed, status=%d", am_status));
         return PJMEDIA_CODEC_EFAILED;
     }
+    PJ_LOG(4,(THIS_FILE, "Encoder started"));
 
-    /*
-     * Configure decoder.
-     */
+    /* Configure and start decoder. */
     vid_fmt = AMediaFormat_new();
     if (!vid_fmt) {
         return PJ_ENOMEM;
@@ -614,7 +620,8 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     am_status = AMediaCodec_configure(anmed_data->dec, vid_fmt, NULL, NULL, 0);
     AMediaFormat_delete(vid_fmt);
     if (am_status != AMEDIA_OK) {
-        PJ_LOG(4,(THIS_FILE, "Decoder configure failed, status=%d", am_status));
+        PJ_LOG(4,(THIS_FILE, "Decoder configure failed, status=%d",
+                  am_status));
         return PJMEDIA_CODEC_EFAILED;
     }
     am_status = AMediaCodec_start(anmed_data->dec);
@@ -622,13 +629,13 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         PJ_LOG(4,(THIS_FILE, "Decoder start failed, status=%d", am_status));
         return PJMEDIA_CODEC_EFAILED;
     }
+    PJ_LOG(4,(THIS_FILE, "Decoder started"));
 
     anmed_data->dec_buf_size = (MAX_RX_WIDTH * MAX_RX_HEIGHT * 3 >> 1) +
 			       (MAX_RX_WIDTH);
     anmed_data->dec_buf = (pj_uint8_t*)pj_pool_alloc(anmed_data->pool,
                                                      anmed_data->dec_buf_size);
 
-    PJ_LOG(4,(THIS_FILE, "AMediaCodec configure done"));
     anmed_data->codec_started = PJ_TRUE;
     return PJ_SUCCESS;
 }
@@ -670,9 +677,72 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
                                             pj_bool_t *has_more)
 {
     struct anmed_codec_data *anmed_data;
+    unsigned i;
+    const unsigned WAIT_RETRY = 10;
+    const unsigned THREAD_WAIT = 10;
+    /* Timeout until the buffer is ready in ms. */
+    const unsigned DEQUEUE_TIMEOUT = 2000;
+    pj_size_t buf_idx;
+    AMediaCodecBufferInfo buf_info;
 
     PJ_ASSERT_RETURN(codec && input && out_size && output && has_more,
                      PJ_EINVAL);
+
+    anmed_data = (anmed_codec_data*) codec->codec_data;
+
+    if (!anmed_data->codec_started) {
+        PJ_LOG(5,(THIS_FILE, "Codec not started"));
+        return PJMEDIA_CODEC_EFAILED;
+    }
+
+    for (i = 0; i < WAIT_RETRY; ++i) {
+        buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->enc, 2000);
+        if (buf_idx >= 0) {
+            pj_size_t output_size;
+            pj_uint8_t *input_buf = AMediaCodec_getInputBuffer(anmed_data->enc,
+                                                        buf_idx, &output_size);
+            if (input_buf && out_size < input->size) {
+                pj_memcpy(input_buf, input->buf, input->size);
+            } else {
+                PJ_LOG(5,(THIS_FILE, "Encoder input_buf:%d "
+                          "get input buffer size: %d, expecting < %d.",
+                          input_buf, output_size, input->size));
+                return PJMEDIA_CODEC_EFAILED;
+            }
+            break;
+        } else {
+            PJ_LOG(5,(THIS_FILE, "Timeout[i] encoder dequeue input buffer",
+                      i));
+            pj_thread_sleep(THREAD_WAIT);
+        }
+    }
+
+    if (i == WAIT_RETRY) {
+        PJ_LOG(5,(THIS_FILE, "Encoder dequeue input buffer failed"));
+        return PJMEDIA_CODEC_EFAILED;
+    }
+
+    buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->enc, &buf_info,
+                                              DEQUEUE_TIMEOUT);
+    if (buf_idx >= 0) {
+        pj_size_t output_size;
+        pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->enc,
+                                                        buf_idx, &output_size);
+
+        if (output_buf) {
+    	    output->type = PJMEDIA_FRAME_TYPE_VIDEO;
+	    output->size = output_size;
+	    output->timestamp = input->timestamp;
+            pj_memcpy(output->buf, output_buf, output_size);
+        } else {
+            PJ_LOG(5, (THIS_FILE, "Encoder output_buf:%d "
+                       "get input buffer size: %d, expecting < %d.",
+                       output_buf, output_size, out_size));
+        }
+    } else {
+        PJ_LOG(5,(THIS_FILE, "Encoder dequeue output buffer return %d index",
+                  buf_idx));
+    }
 
     return PJ_SUCCESS;
 }
