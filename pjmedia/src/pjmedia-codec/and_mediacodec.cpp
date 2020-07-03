@@ -705,14 +705,18 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 
     for (i = 0; i < WAIT_RETRY; ++i) {
     	TRACE_((THIS_FILE, "Wait dequeinput buffer"));
-        buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->enc, 2000);
+        buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->enc, DEQUEUE_TIMEOUT);
         if (buf_idx >= 0) {
+        	media_status_t am_status;
             pj_size_t output_size;
             pj_uint8_t *input_buf = AMediaCodec_getInputBuffer(anmed_data->enc,
                                                         buf_idx, &output_size);
-            if (input_buf && output_size < input->size) {
-            	TRACE_((THIS_FILE, "Setting input buffer, output size : %d", output_size));
-                pj_memcpy(input_buf, input->buf, input->size);
+            if (input_buf && output_size <= input->size) {
+            	TRACE_((THIS_FILE, "Setting input buffer, output size : %d, expected size %d", output_size, input->size));
+                pj_memcpy(input_buf, input->buf, output_size);
+                am_status = AMediaCodec_queueInputBuffer(anmed_data->enc, buf_idx, 0, output_size, 0, 0);
+                		//AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
+                TRACE_((THIS_FILE, "queueInputBuffer return %d", am_status));
             } else {
                 PJ_LOG(4,(THIS_FILE, "Encoder input_buf:%d "
                           "get input buffer size: %d, expecting < %d.",
@@ -735,16 +739,27 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
     buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->enc, &buf_info,
                                               DEQUEUE_TIMEOUT);
     if (buf_idx >= 0) {
+    	char outstr[64];
+    	unsigned x = 0;
         pj_size_t output_size;
         pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->enc,
                                                         buf_idx, &output_size);
 
+        if (output_buf && output_size > 0) {
+    	pj_bzero(outstr, 64);
+        for (;x < 64 && x < output_size;++x) {
+        	pj_uint8_t val = *(output_buf+x);
+        	TRACE_((THIS_FILE, "Outputbuf[%d] : %d", x, val));
+        	//pj_ansi_sprintf(outstr+x, "%d", output_buf+x);
+        }
+        }
+
         if (output_buf) {
         	TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, req outsize %d", output_size, out_size));
+        	pj_memcpy(output->buf, output_buf, out_size);
     	    output->type = PJMEDIA_FRAME_TYPE_VIDEO;
-    	    output->size = output_size;
+    	    output->size = out_size;
     	    output->timestamp = input->timestamp;
-            pj_memcpy(output->buf, output_buf, output_size);
         } else {
             TRACE_((THIS_FILE, "Encoder output_buf:%d "
                        "get output buffer size: %d, expecting < %d.",
