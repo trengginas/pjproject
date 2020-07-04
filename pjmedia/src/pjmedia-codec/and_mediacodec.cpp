@@ -714,7 +714,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
             if (input_buf && output_size <= input->size) {
             	TRACE_((THIS_FILE, "Setting input buffer, output size : %d, expected size %d", output_size, input->size));
                 pj_memcpy(input_buf, input->buf, output_size);
-                am_status = AMediaCodec_queueInputBuffer(anmed_data->enc, buf_idx, 0, output_size, 0, 0);
+                am_status = AMediaCodec_queueInputBuffer(anmed_data->enc, buf_idx, 0, output_size, 0, AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
                 		//AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
                 TRACE_((THIS_FILE, "queueInputBuffer return %d", am_status));
             } else {
@@ -739,31 +739,31 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
     buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->enc, &buf_info,
                                               DEQUEUE_TIMEOUT);
     if (buf_idx >= 0) {
-    	char outstr[64];
-    	unsigned x = 0;
+        char outstr[64];
+        unsigned x = 0;
         pj_size_t output_size;
         pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->enc,
-                                                        buf_idx, &output_size);
+                                                             buf_idx, &output_size);
 
         if (output_buf && output_size > 0) {
-    	pj_bzero(outstr, 64);
-        for (;x < 64 && x < output_size;++x) {
-        	pj_uint8_t val = *(output_buf+x);
-        	TRACE_((THIS_FILE, "Outputbuf[%d] : %d", x, val));
-        	//pj_ansi_sprintf(outstr+x, "%d", output_buf+x);
-        }
+            pj_bzero(outstr, 64);
+            for (; x < 64 && x < output_size; ++x) {
+                pj_uint8_t val = *(output_buf + x);
+                TRACE_((THIS_FILE, "Outputbuf[%d] : %d", x, val));
+                //pj_ansi_sprintf(outstr+x, "%d", output_buf+x);
+            }
         }
 
         if (output_buf) {
-        	TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, req outsize %d", output_size, out_size));
-        	pj_memcpy(output->buf, output_buf, out_size);
-    	    output->type = PJMEDIA_FRAME_TYPE_VIDEO;
-    	    output->size = out_size;
-    	    output->timestamp = input->timestamp;
+            TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, req outsize %d", output_size, buf_info.size, buf_info.offset, out_size));
+            pj_memcpy(output->buf, output_buf, out_size);
+            output->type = PJMEDIA_FRAME_TYPE_VIDEO;
+            output->size = out_size;
+            output->timestamp = input->timestamp;
         } else {
             TRACE_((THIS_FILE, "Encoder output_buf:%d "
-                       "get output buffer size: %d, expecting < %d.",
-                       output_buf, output_size, out_size));
+                    "get output buffer size: %d, expecting < %d.",
+                    output_buf, output_size, out_size));
         }
     } else {
         TRACE_((THIS_FILE, "Encoder dequeue output buffer return %d index", buf_idx));
