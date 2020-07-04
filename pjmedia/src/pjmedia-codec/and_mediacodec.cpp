@@ -746,7 +746,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 
     TRACE_((THIS_FILE, "Done setting input buffer, dequeue output bufer"));
     buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->enc,
-                                              &anmed_data.buf_info,
+                                              &anmed_data->buf_info,
                                               DEQUEUE_TIMEOUT);
     if (buf_idx >= 0) {
         char outstr[64];
@@ -756,9 +756,9 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
                                                              buf_idx,
                                                              &output_size);
 
-        if (output_buf && anmed_data.buf_info.size > 0) {
+        if (output_buf && anmed_data->buf_info.size > 0) {
             pj_bzero(outstr, 64);
-            for (; x < 64 && x < anmed_data.buf_info.size; ++x) {
+            for (; x < 64 && x < anmed_data->buf_info.size; ++x) {
                 pj_uint8_t val = *(output_buf + x);
                 TRACE_((THIS_FILE, "Outputbuf[%d] : %d", x, val));
             }
@@ -771,22 +771,23 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
             goto on_return;
 
         }
-        TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, req outsize %d", output_size, buf_info.size, buf_info.offset, out_size));
+        TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, req outsize %d",
+        		output_size, anmed_data->buf_info.size, anmed_data->buf_info.offset, out_size));
         anmed_data->enc_frame_size = anmed_data->enc_processed = 0;
 
         if (anmed_data->whole) {
             unsigned i, payload_size = 0;
 
-            payload_size = anmed_data.buf_info.size;
+            payload_size = anmed_data->buf_info.size;
             *has_more = PJ_FALSE;
 
-            if (buf_info.size > out_size)
+            if (anmed_data->buf_info.size > out_size)
                 return PJMEDIA_CODEC_EFRMTOOSHORT;
 
             output->type = PJMEDIA_FRAME_TYPE_VIDEO;
             output->size = payload_size;
             output->timestamp = input->timestamp;
-            pj_memcpy(output->buf, payload, payload_size);
+            pj_memcpy(output->buf, output_buf, payload_size);
 
             return PJ_SUCCESS;
         }
@@ -842,7 +843,7 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
         pj_memcpy(output->buf, payload, payload_len);
         output->size = payload_len;
 
-        if (if (anmed_data->buf_info.flag & 1 == 1) {
+        if (anmed_data->buf_info.flags & 1 == 1) {
 	    output->bit_info |= PJMEDIA_VID_FRM_KEYFRAME;
         }
 
@@ -856,7 +857,7 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
     pj_memcpy(output->buf, payload, payload_len);
     output->size = payload_len;
 
-    if (anmed_data->buf_info.flag & 1 == 1) {
+    if (anmed_data->buf_info.flags & 1 == 1) {
 	output->bit_info |= PJMEDIA_VID_FRM_KEYFRAME;
     }
 
