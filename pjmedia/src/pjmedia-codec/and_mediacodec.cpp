@@ -187,6 +187,7 @@ typedef struct anmed_codec_data
     pj_uint8_t			*enc_frame_whole;
     unsigned			 enc_frame_size;
     unsigned			 enc_processed;
+    AMediaCodecBufferInfo        buf_info;
 
     /* Decoder state */
     AMediaCodec                 *dec;
@@ -688,8 +689,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
     const unsigned THREAD_WAIT = 10;
     /* Timeout until the buffer is ready in ms. */
     const unsigned DEQUEUE_TIMEOUT = 2000;
-    pj_size_t buf_idx;
-    AMediaCodecBufferInfo buf_info;
+    pj_size_t buf_idx;    
 
     PJ_ASSERT_RETURN(codec && input && out_size && output && has_more,
                      PJ_EINVAL);
@@ -705,25 +705,34 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 
     for (i = 0; i < WAIT_RETRY; ++i) {
     	TRACE_((THIS_FILE, "Wait dequeinput buffer"));
-        buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->enc, DEQUEUE_TIMEOUT);
+        buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->enc,
+                                                 DEQUEUE_TIMEOUT);
         if (buf_idx >= 0) {
-        	media_status_t am_status;
+            media_status_t am_status;
             pj_size_t output_size;
             pj_uint8_t *input_buf = AMediaCodec_getInputBuffer(anmed_data->enc,
                                                         buf_idx, &output_size);
             if (input_buf && output_size <= input->size) {
             	TRACE_((THIS_FILE, "Setting input buffer, output size : %d, expected size %d", output_size, input->size));
                 pj_memcpy(input_buf, input->buf, output_size);
-                am_status = AMediaCodec_queueInputBuffer(anmed_data->enc, buf_idx, 0, output_size, 0, AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
-                		//AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
-                TRACE_((THIS_FILE, "queueInputBuffer return %d", am_status));
+                am_status = AMediaCodec_queueInputBuffer(anmed_data->enc,
+                                        buf_idx,
+                                        0,
+                                        output_size,
+                                        0,
+                                        AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
+                if (am_status != AMEDIA_OK) {
+                    TRACE_((THIS_FILE, "queueInputBuffer return %d", 
+                            am_status));
+                    goto on_return;
+                }
+                break;
             } else {
                 PJ_LOG(4,(THIS_FILE, "Encoder input_buf:%d "
                           "get input buffer size: %d, expecting < %d.",
                           input_buf, output_size, input->size));
-                return PJMEDIA_CODEC_EFAILED;
+                goto on_return;
             }
-            break;
         } else {
             TRACE_((THIS_FILE, "Timeout[i] encoder dequeue input buffer",i));
             pj_thread_sleep(THREAD_WAIT);
@@ -732,43 +741,66 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 
     if (i == WAIT_RETRY) {
         PJ_LOG(5,(THIS_FILE, "Encoder dequeue input buffer failed"));
-        return PJMEDIA_CODEC_EFAILED;
+        goto on_return;
     }
 
     TRACE_((THIS_FILE, "Done setting input buffer, dequeue output bufer"));
-    buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->enc, &buf_info,
+    buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->enc,
+                                              &anmed_data.buf_info,
                                               DEQUEUE_TIMEOUT);
     if (buf_idx >= 0) {
         char outstr[64];
         unsigned x = 0;
         pj_size_t output_size;
         pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->enc,
-                                                             buf_idx, &output_size);
+                                                             buf_idx,
+                                                             &output_size);
 
-        if (output_buf && output_size > 0) {
+        if (output_buf && anmed_data.buf_info.size > 0) {
             pj_bzero(outstr, 64);
-            for (; x < 64 && x < output_size; ++x) {
+            for (; x < 64 && x < anmed_data.buf_info.size; ++x) {
                 pj_uint8_t val = *(output_buf + x);
                 TRACE_((THIS_FILE, "Outputbuf[%d] : %d", x, val));
-                //pj_ansi_sprintf(outstr+x, "%d", output_buf+x);
             }
         }
 
-        if (output_buf) {
-            TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, req outsize %d", output_size, buf_info.size, buf_info.offset, out_size));
-            pj_memcpy(output->buf, output_buf, out_size);
-            output->type = PJMEDIA_FRAME_TYPE_VIDEO;
-            output->size = out_size;
-            output->timestamp = input->timestamp;
-        } else {
+        if (!output_buf) {
             TRACE_((THIS_FILE, "Encoder output_buf:%d "
                     "get output buffer size: %d, expecting < %d.",
                     output_buf, output_size, out_size));
+            goto on_return;
+
+        }
+        TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, req outsize %d", output_size, buf_info.size, buf_info.offset, out_size));
+        anmed_data->enc_frame_size = anmed_data->enc_processed = 0;
+
+        if (anmed_data->whole) {
+            unsigned i, payload_size = 0;
+
+            payload_size = anmed_data.buf_info.size;
+            *has_more = PJ_FALSE;
+
+            if (buf_info.size > out_size)
+                return PJMEDIA_CODEC_EFRMTOOSHORT;
+
+            output->type = PJMEDIA_FRAME_TYPE_VIDEO;
+            output->size = payload_size;
+            output->timestamp = input->timestamp;
+            pj_memcpy(output->buf, payload, payload_size);
+
+            return PJ_SUCCESS;
         }
     } else {
-        TRACE_((THIS_FILE, "Encoder dequeue output buffer return %d index", buf_idx));
+        TRACE_((THIS_FILE, "Encoder dequeue output buffer return %d index",
+                buf_idx));
+        goto on_return;
     }
 
+    return anmed_codec_encode_more(codec, out_size, output, has_more);
+
+on_return:
+    output->size = 0;
+    output->type = PJMEDIA_FRAME_TYPE_NONE;
     return PJ_SUCCESS;
 }
 
@@ -778,6 +810,64 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
                                            pjmedia_frame *output,
                                            pj_bool_t *has_more)
 {
+    struct anmed_codec_data *anmed_data;
+    const pj_uint8_t *payload;
+    pj_size_t payload_len;
+    pj_status_t status;
+
+    PJ_ASSERT_RETURN(codec && out_size && output && has_more, PJ_EINVAL);
+
+    anmed_data = (anmed_codec_data*) codec->codec_data;
+
+    if (anmed_data->enc_processed < anmed_data->enc_frame_size) {
+	/* We have outstanding frame in packetizer */
+	status = pjmedia_h264_packetize(anmed_data->pktz,
+	                                anmed_data->enc_frame_whole,
+	                                anmed_data->enc_frame_size,
+	                                &anmed_data->enc_processed,
+	                                &payload, &payload_len);
+	if (status != PJ_SUCCESS) {
+	    /* Reset */
+	    anmed_data->enc_frame_size = anmed_data->enc_processed = 0;
+	    *has_more = (anmed_data->enc_processed <
+                         anmed_data->enc_frame_size);
+
+	    PJ_PERROR(3,(THIS_FILE, status, "pjmedia_h264_packetize() error"));
+	    return status;
+	}
+
+	PJ_ASSERT_RETURN(payload_len <= out_size, PJMEDIA_CODEC_EFRMTOOSHORT);
+
+        output->type = PJMEDIA_FRAME_TYPE_VIDEO;
+        pj_memcpy(output->buf, payload, payload_len);
+        output->size = payload_len;
+
+        if (if (anmed_data->buf_info.flag & 1 == 1) {
+	    output->bit_info |= PJMEDIA_VID_FRM_KEYFRAME;
+        }
+
+        *has_more = (anmed_data->enc_processed < anmed_data->enc_frame_size);
+        return PJ_SUCCESS;
+    }
+
+    PJ_ASSERT_RETURN(payload_len <= out_size, PJMEDIA_CODEC_EFRMTOOSHORT);
+
+    output->type = PJMEDIA_FRAME_TYPE_VIDEO;
+    pj_memcpy(output->buf, payload, payload_len);
+    output->size = payload_len;
+
+    if (anmed_data->buf_info.flag & 1 == 1) {
+	output->bit_info |= PJMEDIA_VID_FRM_KEYFRAME;
+    }
+
+    *has_more = (anmed_data->enc_processed < anmed_data->enc_frame_size);
+
+    return PJ_SUCCESS;
+
+no_frame:
+    *has_more = PJ_FALSE;
+    output->size = 0;
+    output->type = PJMEDIA_FRAME_TYPE_NONE;
     return PJ_SUCCESS;
 }
 
