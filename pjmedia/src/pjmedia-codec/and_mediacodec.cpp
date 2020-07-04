@@ -689,7 +689,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
     const unsigned THREAD_WAIT = 10;
     /* Timeout until the buffer is ready in ms. */
     const unsigned DEQUEUE_TIMEOUT = 2000;
-    pj_size_t buf_idx;    
+    pj_size_t buf_idx;
 
     PJ_ASSERT_RETURN(codec && input && out_size && output && has_more,
                      PJ_EINVAL);
@@ -774,6 +774,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
         TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, req outsize %d",
         		output_size, anmed_data->buf_info.size, anmed_data->buf_info.offset, out_size));
         anmed_data->enc_frame_size = anmed_data->enc_processed = 0;
+        anmed_data->enc_frame_whole = output_buf;
 
         if (anmed_data->whole) {
             unsigned i, payload_size = 0;
@@ -787,7 +788,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
             output->type = PJMEDIA_FRAME_TYPE_VIDEO;
             output->size = payload_size;
             output->timestamp = input->timestamp;
-            pj_memcpy(output->buf, output_buf, payload_size);
+            pj_memcpy(output->buf, anmed_data->enc_frame_whole, payload_size);
 
             return PJ_SUCCESS;
         }
@@ -851,6 +852,22 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
         return PJ_SUCCESS;
     }
 
+    anmed_data->enc_processed = 0;
+    anmed_data->enc_frame_size = 0;
+
+    status = pjmedia_h264_packetize(anmed_data->pktz,
+				    anmed_data->enc_frame_whole,
+				    anmed_data->enc_frame_size,
+				    &anmed_data->enc_processed,
+				    &payload, &payload_len);
+    if (status != PJ_SUCCESS) {
+	/* Reset */
+	anmed_data->enc_frame_size = anmed_data->enc_processed = 0;
+
+	PJ_PERROR(3,(THIS_FILE, status, "pjmedia_h264_packetize() error [2]"));
+	return status;
+    }
+
     PJ_ASSERT_RETURN(payload_len <= out_size, PJMEDIA_CODEC_EFRMTOOSHORT);
 
     output->type = PJMEDIA_FRAME_TYPE_VIDEO;
@@ -864,65 +881,6 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
     *has_more = (anmed_data->enc_processed < anmed_data->enc_frame_size);
 
     return PJ_SUCCESS;
-
-no_frame:
-    *has_more = PJ_FALSE;
-    output->size = 0;
-    output->type = PJMEDIA_FRAME_TYPE_NONE;
-    return PJ_SUCCESS;
-}
-
-static int write_yuv(pj_uint8_t *buf,
-                     unsigned dst_len,
-                     unsigned char* pData[3],
-                     int iStride[2],
-                     int iWidth,
-                     int iHeight)
-{
-    unsigned req_size;
-    pj_uint8_t *dst = buf;
-    pj_uint8_t *max = dst + dst_len;
-    int   i;
-    unsigned char*  pPtr = NULL;
-
-    req_size = (iWidth * iHeight) + (iWidth / 2 * iHeight / 2) +
-	       (iWidth / 2 * iHeight / 2);
-    if (dst_len < req_size)
-	return -1;
-
-    pPtr = pData[0];
-    for (i = 0; i < iHeight && (dst + iWidth < max); i++) {
-	pj_memcpy(dst, pPtr, iWidth);
-	pPtr += iStride[0];
-	dst += iWidth;
-    }
-
-    if (i < iHeight)
-	return -1;
-
-    iHeight = iHeight / 2;
-    iWidth = iWidth / 2;
-    pPtr = pData[1];
-    for (i = 0; i < iHeight && (dst + iWidth <= max); i++) {
-	pj_memcpy(dst, pPtr, iWidth);
-	pPtr += iStride[1];
-	dst += iWidth;
-    }
-
-    if (i < iHeight)
-	return -1;
-
-    pPtr = pData[2];
-    for (i = 0; i < iHeight && (dst + iWidth <= max); i++) {
-	pj_memcpy(dst, pPtr, iWidth);
-	pPtr += iStride[1];
-	dst += iWidth;
-    }
-
-    if (i < iHeight)
-	return -1;
-
-    return dst - buf;
 }
 
 static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
