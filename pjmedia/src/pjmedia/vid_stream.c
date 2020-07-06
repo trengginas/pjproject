@@ -1181,7 +1181,7 @@ static pj_status_t put_frame(pjmedia_port *port,
                 unsigned x = 0;
                 for (; x < 64 && x < frame_out.size; ++x) {
                     pj_uint8_t val = *((pj_uint8_t*)channel->buf + x);
-                    TRACE_((THIS_FILE, "Payload sent[%d] : %d", x, val));
+                    PJ_LOG(4,(THIS_FILE, "Payload sent[%d] : %d", x, val));
                 }
             }
 
