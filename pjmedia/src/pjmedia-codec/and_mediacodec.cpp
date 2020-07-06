@@ -848,13 +848,13 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
         }
 
         TRACE_((THIS_FILE, "Done packetizing[1], enc_processed %d, enc_frame_size %d", anmed_data->enc_processed, anmed_data->enc_frame_size));
-        if (payload_len > 0) {
-            unsigned x = 0;
-            for (; x < 64 && x < payload_len; ++x) {
-                pj_uint8_t val = *(payload + x);
-                TRACE_((THIS_FILE, "Payload[%d] : %d", x, val));
-            }
-        }
+        //if (payload_len > 0) {
+        //    unsigned x = 0;
+        //    for (; x < 64 && x < payload_len; ++x) {
+        //        pj_uint8_t val = *(payload + x);
+        //        TRACE_((THIS_FILE, "Payload[%d] : %d", x, val));
+        //    }
+        //}
         return PJ_SUCCESS;
     }
 
