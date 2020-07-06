@@ -702,10 +702,10 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
         return PJMEDIA_CODEC_EFAILED;
     }
 
-    TRACE_((THIS_FILE, "Begin encode"));
+    //TRACE_((THIS_FILE, "Begin encode"));
 
     for (i = 0; i < WAIT_RETRY; ++i) {
-    	TRACE_((THIS_FILE, "Wait dequeinput buffer"));
+    	//TRACE_((THIS_FILE, "Wait dequeinput buffer"));
         buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->enc,
                                                  DEQUEUE_TIMEOUT);
         if (buf_idx >= 0) {
@@ -758,8 +758,8 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
                                                              &output_size);
         if (!output_buf) {
             TRACE_((THIS_FILE, "Encoder output_buf:%d "
-                    "get output buffer size: %d, expecting < %d.",
-                    output_buf, output_size, out_size));
+                    "get output buffer size: %d, offset %d, flags %d, expecting < %d.",
+                    output_buf, anmed_data->buf_info.size, anmed_data->buf_info.offset, anmed_data->buf_info.flags, out_size));
             goto on_return;
 
         }

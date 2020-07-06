@@ -1176,7 +1176,7 @@ static pj_status_t put_frame(pjmedia_port *port,
 		    stream->rtp_tx_err_cnt = 0;
 		}
 	    }
-            PJ_LOG(4, (THIS_FILE, "DONE Sending RTP payload"));
+            //PJ_LOG(4, (THIS_FILE, "DONE Sending RTP payload"));
             //if (frame_out.size > 0) {
             //    unsigned x = 0;
             //    unsigned size_rtp_hdr = sizeof(pjmedia_rtp_hdr);
