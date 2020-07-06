@@ -756,14 +756,6 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
         pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->enc,
                                                              buf_idx,
                                                              &output_size);
-
-        if (output_buf && anmed_data->buf_info.size > 0) {
-            for (; x < 64 && x < anmed_data->buf_info.size; ++x) {
-                pj_uint8_t val = *(output_buf + x);
-                TRACE_((THIS_FILE, "Outputbuf[%d] : %d", x, val));
-            }
-        }
-
         if (!output_buf) {
             TRACE_((THIS_FILE, "Encoder output_buf:%d "
                     "get output buffer size: %d, expecting < %d.",

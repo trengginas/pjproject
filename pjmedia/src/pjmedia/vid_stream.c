@@ -1176,6 +1176,15 @@ static pj_status_t put_frame(pjmedia_port *port,
 		    stream->rtp_tx_err_cnt = 0;
 		}
 	    }
+            PJ_LOG(4, (THIS_FILE, "DONE Sending RTP payload"));
+            if (frame_out.size > 0) {
+                unsigned x = 0;
+                for (; x < 64 && x < frame_out.size; ++x) {
+                    pj_uint8_t val = *((pj_uint8_t*)channel->buf + x);
+                    TRACE_((THIS_FILE, "Payload sent[%d] : %d", x, val));
+                }
+            }
+
 	    pjmedia_rtcp_tx_rtp(&stream->rtcp, (unsigned)frame_out.size);
 	    total_sent += frame_out.size;
 	    pkt_cnt++;
