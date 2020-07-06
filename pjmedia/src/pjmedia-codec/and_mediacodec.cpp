@@ -864,8 +864,15 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
     }
 
     anmed_data->enc_processed = 0;
-    anmed_data->enc_frame_size = 0;
+    anmed_data->enc_frame_size = anmed_data->buf_info.size;
 
+    if (anmed_data->enc_frame_size > 0) {
+        unsigned x = 0;
+        for (; x < 64 && x < anmed_data->enc_frame_size; ++x) {
+            pj_uint8_t val = *(anmed_data->enc_frame_whole + x);
+            TRACE_((THIS_FILE, "Input buf[%d] : %d", x, val));
+        }
+    }
     status = pjmedia_h264_packetize(anmed_data->pktz,
 				    anmed_data->enc_frame_whole,
 				    anmed_data->enc_frame_size,
