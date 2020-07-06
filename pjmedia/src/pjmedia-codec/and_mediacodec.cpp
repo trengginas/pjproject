@@ -771,8 +771,8 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
             goto on_return;
 
         }
-        TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, req outsize %d",
-        		output_size, anmed_data->buf_info.size, anmed_data->buf_info.offset, out_size));
+        TRACE_((THIS_FILE, "Done getting outputbuffer, copy to output frame, get output size %d, buf_info size %d, buf_info offset %d, buf_info flags %d, req outsize %d",
+        		output_size, anmed_data->buf_info.size, anmed_data->buf_info.offset, anmed_data->buf_info.flags, out_size));
         anmed_data->enc_frame_size = anmed_data->enc_processed = 0;
         anmed_data->enc_frame_whole = output_buf;
 
@@ -821,6 +821,8 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
 
     anmed_data = (anmed_codec_data*) codec->codec_data;
 
+    TRACE_((THIS_FILE, "encode more!!"));
+
     if (anmed_data->enc_processed < anmed_data->enc_frame_size) {
 	/* We have outstanding frame in packetizer */
 	status = pjmedia_h264_packetize(anmed_data->pktz,
@@ -849,6 +851,8 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
         }
 
         *has_more = (anmed_data->enc_processed < anmed_data->enc_frame_size);
+
+        TRACE_((THIS_FILE, "Done packetizing[1], enc_processed %d, enc_frame_size %d", anmed_data->enc_processed, anmed_data->enc_frame_size));
         return PJ_SUCCESS;
     }
 
@@ -879,7 +883,7 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
     }
 
     *has_more = (anmed_data->enc_processed < anmed_data->enc_frame_size);
-
+    TRACE_((THIS_FILE, "Done packetizing[2], enc_processed %d, enc_frame_size %d", anmed_data->enc_processed, anmed_data->enc_frame_size));
     return PJ_SUCCESS;
 }
 
