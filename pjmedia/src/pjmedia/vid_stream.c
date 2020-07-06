@@ -1179,9 +1179,10 @@ static pj_status_t put_frame(pjmedia_port *port,
             PJ_LOG(4, (THIS_FILE, "DONE Sending RTP payload"));
             if (frame_out.size > 0) {
                 unsigned x = 0;
-                for (; x < 64 && x < frame_out.size; ++x) {
+                unsigned size_rtp_hdr = sizeof(pjmedia_rtp_hdr);
+                for (; x < 128 && x < frame_out.size + size_rtp_hdr; ++x) {
                     pj_uint8_t val = *((pj_uint8_t*)channel->buf + x);
-                    PJ_LOG(4,(THIS_FILE, "Payload sent[%d] : %d", x, val));
+                    PJ_LOG(4,(THIS_FILE, "%s Payload sent[%d] : %d", (x < size_rtp_hdr)?"RTP Header":"Content", x, val));
                 }
             }
 
