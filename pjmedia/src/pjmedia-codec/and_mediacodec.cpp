@@ -561,6 +561,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     }
     pj_bzero(&pktz_cfg, sizeof(pktz_cfg));
     pktz_cfg.mtu = param->enc_mtu;
+    pktz_cfg.unpack_nal_start = 4;
     /* Packetization mode */
     if (h264_fmtp.packetization_mode == 0)
 	pktz_cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_SINGLE_NAL;
@@ -757,7 +758,6 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
                                                              &output_size);
 
         if (output_buf && anmed_data->buf_info.size > 0) {
-            pj_bzero(outstr, 64);
             for (; x < 64 && x < anmed_data->buf_info.size; ++x) {
                 pj_uint8_t val = *(output_buf + x);
                 TRACE_((THIS_FILE, "Outputbuf[%d] : %d", x, val));
@@ -853,6 +853,13 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
         *has_more = (anmed_data->enc_processed < anmed_data->enc_frame_size);
 
         TRACE_((THIS_FILE, "Done packetizing[1], enc_processed %d, enc_frame_size %d", anmed_data->enc_processed, anmed_data->enc_frame_size));
+        if (payload_len > 0) {
+            unsigned x = 0;
+            for (; x < 64 && x < payload_len; ++x) {
+                pj_uint8_t val = *(payload + x);
+                TRACE_((THIS_FILE, "Payload[%d] : %d", x, val));
+            }
+        }
         return PJ_SUCCESS;
     }
 
@@ -884,6 +891,15 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
 
     *has_more = (anmed_data->enc_processed < anmed_data->enc_frame_size);
     TRACE_((THIS_FILE, "Done packetizing[2], enc_processed %d, enc_frame_size %d", anmed_data->enc_processed, anmed_data->enc_frame_size));
+
+    if (payload_len > 0) {
+        unsigned x = 0;
+        for (; x < 64 && x < payload_len; ++x) {
+            pj_uint8_t val = *(payload + x);
+            TRACE_((THIS_FILE, "Payload[%d] : %d", x, val));
+        }
+    }
+
     return PJ_SUCCESS;
 }
 
