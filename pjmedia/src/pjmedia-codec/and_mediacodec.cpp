@@ -210,6 +210,7 @@ typedef struct anmed_codec_data
     /* Decoder state */
     AMediaCodec                 *dec;
     pj_uint8_t			*dec_buf;
+    unsigned			 dec_stride_len;
     unsigned			 dec_buf_size;
     char			 dec_sps_buf[SPS_PPS_BUF_SIZE];
     char			 dec_sps_len;
@@ -239,8 +240,8 @@ static pj_status_t configure_decoder(anmed_codec_data *anmed_data) {
 	                  anmed_data->prm->dec_fmt.det.vid.size.w);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_HEIGHT,
 	                  anmed_data->prm->dec_fmt.det.vid.size.h);
-    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT,
-                          ANMED_COLOR_FMT);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, 0x13);
+//                          ANMED_COLOR_FMT);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_MAX_INPUT_SZ, 0);
     AMediaFormat_setInt32(vid_fmt, "encoder", 0);
     AMediaFormat_setInt32(vid_fmt, "low-latency", 0);
@@ -1111,6 +1112,58 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
     return PJ_SUCCESS;
 }
 
+static int write_yuv(pj_uint8_t *buf,
+                     unsigned dst_len,
+                     unsigned char* input,
+                     int stride_len,
+                     int iWidth,
+                     int iHeight)
+{
+    unsigned req_size;
+    pj_uint8_t *dst = buf;
+    pj_uint8_t *max = dst + dst_len;
+    int   i;
+    unsigned char*  pPtr = NULL;
+
+    req_size = (iWidth * iHeight) + (iWidth / 2 * iHeight / 2) +
+	       (iWidth / 2 * iHeight / 2);
+    if (dst_len < req_size)
+	return -1;
+
+    pPtr = input;
+    for (i = 0; i < iHeight && (dst + iWidth < max); i++) {
+	pj_memcpy(dst, pPtr, iWidth);
+	pPtr += stride_len;
+	dst += iWidth;
+    }
+
+    if (i < iHeight)
+	return -1;
+
+    iHeight = iHeight / 2;
+    iWidth = iWidth / 2;
+    for (i = 0; i < iHeight && (dst + iWidth <= max); i++) {
+	pj_memcpy(dst, pPtr, iWidth);
+	pPtr += stride_len/2;
+	dst += iWidth;
+    }
+
+    if (i < iHeight)
+	return -1;
+
+    for (i = 0; i < iHeight && (dst + iWidth <= max); i++) {
+	pj_memcpy(dst, pPtr, iWidth);
+	pPtr += stride_len/2;
+	dst += iWidth;
+    }
+
+    if (i < iHeight)
+	return -1;
+
+    return dst - buf;
+}
+
+
 static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
                                       pj_size_t count,
                                       pjmedia_frame packets[],
@@ -1372,6 +1425,7 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
 
     //TRACE_((THIS_FILE, "Decoder dequeue output buffer buf_idx %d",buf_idx));
     if (buf_idx >= 0) {
+	int width, height, color_fmt, stride, slice_height, len;
 	pj_size_t output_size;
 	pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->dec,
 							     buf_idx,
@@ -1384,18 +1438,45 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
 	    goto on_error;
 	}
 
-	TRACE_((THIS_FILE, "Decoder GOT FRAME output_buf:0x%x "
-	   "get output buffer size: %d, offset %d, flags %d, buf_idx %d",
-	   output_buf, anmed_data->dec_buf_info.size,
-	   anmed_data->dec_buf_info.offset, anmed_data->dec_buf_info.flags, buf_idx));
+	AMediaFormat *vid_fmt = AMediaCodec_getOutputFormat(anmed_data->dec);
 
-	output->type = PJMEDIA_FRAME_TYPE_VIDEO;
-	output->size = anmed_data->dec_buf_info.size;
-	output->timestamp = packets[0].timestamp;
-	pj_memcpy((pj_uint8_t*)output->buf,
-		  output_buf, anmed_data->dec_buf_info.size);
+	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_WIDTH, &width);
+	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_HEIGHT, &height);
+	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_COLOR_FMT, &color_fmt);
+	AMediaFormat_getInt32(vid_fmt, "stride", &stride);
+	AMediaFormat_getInt32(vid_fmt, "slice-height", &slice_height);
+
+	AMediaFormat_delete(vid_fmt);
+
+	len = write_yuv((pj_uint8_t *)output->buf, anmed_data->dec_buf_info.size, output_buf, anmed_data->dec_stride_len,
+		anmed_data->prm->dec_fmt.det.vid.size.w,
+		anmed_data->prm->dec_fmt.det.vid.size.h);
+
+//	TRACE_((THIS_FILE, "Decoder GOT FRAME output_buf:0x%x "
+//	   "get output buffer size: %d, offset %d, flags %d, buf_idx %d",
+//	   output_buf, anmed_data->dec_buf_info.size,
+//	   anmed_data->dec_buf_info.offset, anmed_data->dec_buf_info.flags, buf_idx));
+
+	if (len > 0) {
+	    output->type = PJMEDIA_FRAME_TYPE_VIDEO;
+	    output->size = len;
+	    output->timestamp = packets[0].timestamp;
+
+		TRACE_((THIS_FILE, "Decoder GET FRAME width %d, height %d, color_fmt 0x%X, stride %d, slice-height %d, buf_size %d, output len %d",
+			width, height, color_fmt, stride, slice_height, anmed_data->dec_buf_info.size, len));
+	} else {
+	    output->size = 0;
+	    return PJMEDIA_CODEC_EFRMTOOSHORT;
+	}
+
+//	pj_memcpy((pj_uint8_t*)output->buf,
+//		  output_buf, anmed_data->dec_buf_info.size);
+
+	AMediaCodec_releaseOutputBuffer(anmed_data->dec,
+					buf_idx,
+					0);
     } else if (buf_idx == -2) {
-	int width, height;
+	int width, height, color_fmt, stride, slice_height, crop_left, crop_right, crop_top, crop_bottom;
 
 	/* Format change. */
 	TRACE_((THIS_FILE, "Decoder detect format change %d index",
@@ -1405,11 +1486,15 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
 
 	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_WIDTH, &width);
 	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_HEIGHT, &height);
+	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_COLOR_FMT, &color_fmt);
+	AMediaFormat_getInt32(vid_fmt, "stride", &stride);
+	AMediaFormat_getInt32(vid_fmt, "slice-height", &slice_height);
 
-	TRACE_((THIS_FILE, "Decoder GET new width %d, height %d",
-		width, height));
+	TRACE_((THIS_FILE, "Decoder GET new width %d, height %d, color_fmt 0x%X, stride %d, slice-height %d, buf_size %d",
+		width, height, color_fmt, stride, slice_height, anmed_data->dec_buf_info.size));
 
 	AMediaFormat_delete(vid_fmt);
+	anmed_data->dec_stride_len = stride;
 	if (width != anmed_data->prm->dec_fmt.det.vid.size.w ||
 	    height != anmed_data->prm->dec_fmt.det.vid.size.h)
 	{
