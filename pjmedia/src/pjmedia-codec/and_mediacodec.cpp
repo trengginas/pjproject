@@ -487,21 +487,17 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
 
     anmed_data->enc = AMediaCodec_createCodecByName(enc_name);
     if (!anmed_data->enc) {
-	PJ_LOG(4,(THIS_FILE, "Failed creating encoder: %s",
-		  enc_name));
+	PJ_LOG(4,(THIS_FILE, "Failed creating encoder: %s", enc_name));
 	goto on_error;
     }
-    PJ_LOG(4, (THIS_FILE, "Success creating encoder: %s",
-	       enc_name));
+    PJ_LOG(4, (THIS_FILE, "Success creating encoder: %s", enc_name));
 
     anmed_data->dec = AMediaCodec_createCodecByName(dec_name);
     if (!anmed_data->dec) {
-	PJ_LOG(4,(THIS_FILE, "Failed creating decoder: %s",
-		  dec_name));
+	PJ_LOG(4,(THIS_FILE, "Failed creating decoder: %s", dec_name));
 	goto on_error;
     }
-    PJ_LOG(4, (THIS_FILE, "Success creating decoder : %s",
-	       dec_name));
+    PJ_LOG(4, (THIS_FILE, "Success creating decoder : %s", dec_name));
 
     *p_codec = codec;
     return PJ_SUCCESS;
