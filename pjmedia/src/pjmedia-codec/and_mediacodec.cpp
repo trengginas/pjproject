@@ -30,17 +30,12 @@
 #include "media/NdkMediaCodec.h"
 
 /*
-#if __ANDROID_API__ >=19
-#endif
-*/
-
-/*
  * Constants
  */
 #define THIS_FILE		"and_mediacodec.cpp"
-#define ANMED_H264_MIME_TYPE    "video/avc"
-#define ANMED_OMX_H264_ENCODER  "OMX.google.h264.encoder"
-#define ANMED_OMX_H264_DECODER  "OMX.google.h264.decoder"
+#define ANMED_AVC_MIME_TYPE    	"video/avc"
+#define ANMED_OMX_AVC_ENCODER   "OMX.google.h264.encoder"
+#define ANMED_OMX_AVC_DECODER   "OMX.google.h264.decoder"
 #define ANMED_KEY_COLOR_FMT     "color-format"
 #define ANMED_KEY_WIDTH         "width"
 #define ANMED_KEY_HEIGHT        "height"
@@ -57,7 +52,7 @@
 #define ANMED_KEY_LOW_LATENCY	"low-latency"
 #define ANMED_KEY_STRIDE	"stride"
 //#define ANMED_COLOR_FMT         0x7f420888 /* YUV420Flexible */
-#define ANMED_COLOR_FMT         0x13
+#define ANMED_I420_PLANAR_FMT   0x13
 #define ANMED_QUEUE_TIMEOUT     2000*100
 
 #define DEFAULT_WIDTH		352
@@ -211,7 +206,7 @@ static pj_status_t configure_decoder(anmed_codec_data *anmed_data) {
         return PJ_ENOMEM;
     }
 
-    AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_H264_MIME_TYPE);
+    AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_AVC_MIME_TYPE);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_FRAME_RATE,
 			  (anmed_data->prm->dec_fmt.det.vid.fps.num /
 			   anmed_data->prm->dec_fmt.det.vid.fps.denum));
@@ -219,7 +214,7 @@ static pj_status_t configure_decoder(anmed_codec_data *anmed_data) {
 	                  anmed_data->prm->dec_fmt.det.vid.size.w);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_HEIGHT,
 	                  anmed_data->prm->dec_fmt.det.vid.size.h);
-    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_I420_PLANAR_FMT);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_MAX_INPUT_SZ, 0);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_ENCODER, 0);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_LOW_LATENCY, 1);
@@ -335,8 +330,9 @@ static pj_status_t anmed_test_alloc(pjmedia_vid_codec_factory *factory,
     PJ_ASSERT_RETURN(factory == &anmed_factory.base, PJ_EINVAL);
     
 
-    if (info->fmt_id == PJMEDIA_FORMAT_H264 &&
-	info->pt != 0)
+    if ((info->fmt_id == PJMEDIA_FORMAT_H264 ||
+	 info->fmt_id == PJMEDIA_FORMAT_VP8 ||
+	 info->fmt_id == PJMEDIA_FORMAT_VP9) && info->pt != 0)
     {
 	return PJ_SUCCESS;
     }    
@@ -357,7 +353,7 @@ static pj_status_t anmed_default_attr(pjmedia_vid_codec_factory *factory,
     attr->packing = PJMEDIA_VID_PACKING_PACKETS;
 
     /* Encoded format */
-    pjmedia_format_init_video(&attr->enc_fmt, PJMEDIA_FORMAT_H264,
+    pjmedia_format_init_video(&attr->enc_fmt, info->fmt_id,
                               DEFAULT_WIDTH, DEFAULT_HEIGHT,
 			      DEFAULT_FPS, 1);
 
@@ -367,11 +363,25 @@ static pj_status_t anmed_default_attr(pjmedia_vid_codec_factory *factory,
 			      DEFAULT_FPS, 1);
 
     /* Decoding fmtp */
-    attr->dec_fmtp.cnt = 2;
-    attr->dec_fmtp.param[0].name = pj_str((char*)"profile-level-id");
-    attr->dec_fmtp.param[0].val = pj_str((char*)"42e01e");
-    attr->dec_fmtp.param[1].name = pj_str((char*)" packetization-mode");
-    attr->dec_fmtp.param[1].val = pj_str((char*)"1");
+    if (info->fmt_id == PJMEDIA_FORMAT_H264) {
+	attr->dec_fmtp.cnt = 2;
+	attr->dec_fmtp.param[0].name = pj_str((char*)"profile-level-id");
+	attr->dec_fmtp.param[0].val = pj_str((char*)"42e01e");
+	attr->dec_fmtp.param[1].name = pj_str((char*)" packetization-mode");
+	attr->dec_fmtp.param[1].val = pj_str((char*)"1");
+    } else if (info->fmt_id == PJMEDIA_FORMAT_VP8 ||
+	       info->fmt_id == PJMEDIA_FORMAT_VP9)
+    {
+	/* Decoding fmtp */
+	/* If the implementation is willing to receive media, both parameters
+	 * MUST be provided.
+	 */
+	attr->dec_fmtp.cnt = 2;
+	attr->dec_fmtp.param[0].name = pj_str((char*)"max-fr");
+	attr->dec_fmtp.param[0].val = pj_str((char*)"30");
+	attr->dec_fmtp.param[1].name = pj_str((char*)" max-fs");
+	attr->dec_fmtp.param[1].val = pj_str((char*)"580");
+    }
 
     /* Bitrate */
     attr->enc_fmt.det.vid.avg_bps = DEFAULT_AVG_BITRATE;
@@ -387,27 +397,54 @@ static pj_status_t anmed_enum_info(pjmedia_vid_codec_factory *factory,
                                    unsigned *count,
                                    pjmedia_vid_codec_info info[])
 {
+    unsigned i = 0;
+
     PJ_ASSERT_RETURN(info && *count > 0, PJ_EINVAL);
     PJ_ASSERT_RETURN(factory == &anmed_factory.base, PJ_EINVAL);
 
-    *count = 1;
-    info->fmt_id = PJMEDIA_FORMAT_H264;
-    info->pt = PJMEDIA_RTP_PT_H264;
-    info->encoding_name = pj_str((char*)"H264");
-    info->encoding_desc = pj_str((char*)"Android AMediaCodec");
-    info->clock_rate = 90000;
-    info->dir = PJMEDIA_DIR_ENCODING_DECODING;
-    info->dec_fmt_id_cnt = 1;
-    info->dec_fmt_id[0] = PJMEDIA_FORMAT_I420;
-    info->packings = PJMEDIA_VID_PACKING_PACKETS |
-		     PJMEDIA_VID_PACKING_WHOLE;
-    info->fps_cnt = 3;
-    info->fps[0].num = 15;
-    info->fps[0].denum = 1;
-    info->fps[1].num = 25;
-    info->fps[1].denum = 1;
-    info->fps[2].num = 30;
-    info->fps[2].denum = 1;
+#if PJMEDIA_HAS_ANMED_AVC
+    info[i].fmt_id = PJMEDIA_FORMAT_H264;
+    info[i].pt = PJMEDIA_RTP_PT_H264;
+    info[i].encoding_name = pj_str((char*)"H264");
+    info[i].encoding_desc = pj_str((char*)"Android MediaCodec AVC/H264 codec");
+    i++;
+#endif
+
+#if PJMEDIA_HAS_ANMED_VP8
+    if (i + 1 < *count) {
+	info[i].fmt_id = PJMEDIA_FORMAT_VP8;
+	info[i].pt = PJMEDIA_RTP_PT_VP8;
+	info[i].encoding_name = pj_str((char*)"VP8");
+	info[i].encoding_desc = pj_str((char*)"Android MediaCodec VP8 codec");
+	i++;
+    }
+#endif
+
+#if PJMEDIA_HAS_ANMED_VP9
+    if (i + 1 < *count) {
+    	info[i].fmt_id = PJMEDIA_FORMAT_VP9;
+    	info[i].pt = PJMEDIA_RTP_PT_VP9;
+    	info[i].encoding_name = pj_str((char*)"VP9");
+    	info[i].encoding_desc = pj_str((char*)"Android MediaCodec VP9 codec");
+    	i++;
+    }
+#endif
+
+    *count = i;
+    for (i = 0; i < *count; i++) {
+    	info[i].clock_rate = 90000;
+    	info[i].dir = PJMEDIA_DIR_ENCODING_DECODING;
+    	info[i].dec_fmt_id_cnt = 1;
+    	info[i].dec_fmt_id[0] = PJMEDIA_FORMAT_I420;
+    	info[i].packings = PJMEDIA_VID_PACKING_PACKETS;
+    	info[i].fps_cnt = 3;
+    	info[i].fps[0].num = 15;
+    	info[i].fps[0].denum = 1;
+    	info[i].fps[1].num = 25;
+    	info[i].fps[1].denum = 1;
+    	info[i].fps[2].num = 30;
+    	info[i].fps[2].denum = 1;
+    }
 
     return PJ_SUCCESS;
 }
@@ -419,6 +456,7 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     pj_pool_t *pool;
     pjmedia_vid_codec *codec;
     anmed_codec_data *anmed_data;
+    char *enc_name = NULL, *dec_name = NULL;
 
     PJ_ASSERT_RETURN(factory == &anmed_factory.base && info && p_codec,
                      PJ_EINVAL);
@@ -439,25 +477,31 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     anmed_data->pool = pool;
     codec->codec_data = anmed_data;
 
-    anmed_data->enc = AMediaCodec_createCodecByName(ANMED_OMX_H264_ENCODER);
-    if (!anmed_data->enc) {
-        PJ_LOG(4,(THIS_FILE, "Failed creating encoder: %s",
-                  ANMED_OMX_H264_ENCODER));
-        goto on_error;
+    if (info->fmt_id == PJMEDIA_FORMAT_H264) {
+	enc_name = ANMED_OMX_AVC_ENCODER;
+	dec_name = ANMED_OMX_AVC_DECODER;
+    } else if (info->fmt_id == PJMEDIA_FORMAT_VP8) {
+
+    } else if (info->fmt_id == PJMEDIA_FORMAT_VP8) {
     }
 
+    anmed_data->enc = AMediaCodec_createCodecByName(enc_name);
+    if (!anmed_data->enc) {
+	PJ_LOG(4,(THIS_FILE, "Failed creating encoder: %s",
+		  enc_name));
+	goto on_error;
+    }
     PJ_LOG(4, (THIS_FILE, "Success creating encoder: %s",
-               ANMED_OMX_H264_ENCODER));
+	       enc_name));
 
-    //anmed_data->dec = AMediaCodec_createCodecByName(ANMED_OMX_H264_DECODER);
-    anmed_data->dec = AMediaCodec_createDecoderByType("video/avc");
+    anmed_data->dec = AMediaCodec_createCodecByName(dec_name);
     if (!anmed_data->dec) {
-        PJ_LOG(4,(THIS_FILE, "Failed creating decoder: %s",
-                  ANMED_OMX_H264_DECODER));
-        goto on_error;
+	PJ_LOG(4,(THIS_FILE, "Failed creating decoder: %s",
+		  dec_name));
+	goto on_error;
     }
     PJ_LOG(4, (THIS_FILE, "Success creating decoder : %s",
-               ANMED_OMX_H264_DECODER));
+	       dec_name));
 
     *p_codec = codec;
     return PJ_SUCCESS;
@@ -561,8 +605,8 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     if (!vid_fmt) {
         return PJ_ENOMEM;
     }
-    AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_H264_MIME_TYPE);
-    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_COLOR_FMT);
+    AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_AVC_MIME_TYPE);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_COLOR_FMT, ANMED_I420_PLANAR_FMT);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_HEIGHT,
                           param->enc_fmt.det.vid.size.h);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_WIDTH,
@@ -1176,15 +1220,19 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
 	}
 
 	if (i == CODEC_WAIT_RETRY) {
-	    PJ_LOG(4,(THIS_FILE, "Decoder dequeueInputBuffer failed"));
+	    PJ_LOG(4,(THIS_FILE, "Failed decoding"));
 	    goto on_return;
 	}
 
-	if (buf_pos + frm_size >= whole_len)
+	if (buf_pos + frm_size >= whole_len) {
 	    break;
+	}
 
 	buf_pos += frm_size;
     }
+
+    /* Signal end of stream. */
+
 
     for (i = 0; i < CODEC_WAIT_RETRY; ++i) {
 	buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->dec,
