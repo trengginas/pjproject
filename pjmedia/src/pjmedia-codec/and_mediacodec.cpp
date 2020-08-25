@@ -50,6 +50,7 @@
 #define ANMED_KEY_MAX_INPUT_SZ  "max-input-size"
 #define ANMED_KEY_ENCODER	"encoder"
 #define ANMED_KEY_LOW_LATENCY	"low-latency"
+#define ANMED_KEY_PRIORITY	"priority"
 #define ANMED_KEY_STRIDE	"stride"
 //#define ANMED_COLOR_FMT         0x7f420888 /* YUV420Flexible */
 #define ANMED_I420_PLANAR_FMT   0x13
@@ -70,16 +71,10 @@
 /* Maximum duration from one key frame to the next (in seconds). */
 #define KEYFRAME_INTERVAL	1
 
-#define CODEC_WAIT_RETRY 	20
+#define CODEC_WAIT_RETRY 	10
 #define CODEC_THREAD_WAIT 	10
 /* Timeout until the buffer is ready in ms. */
-#define CODEC_DEQUEUE_TIMEOUT 	2000
-
-#if 1
-#define TRACE_(expr) PJ_LOG(5, expr)
-#else
-#define TRACE(expr) 0
-#endif
+#define CODEC_DEQUEUE_TIMEOUT 	1000
 
 /*
  * Factory operations.
@@ -160,6 +155,7 @@ static struct anmed_factory
 } anmed_factory;
 
 enum anmed_frm_type {
+    ANMED_FRM_TYPE_DEFAULT = 0,
     ANMED_FRM_TYPE_KEYFRAME = 1,
     ANMED_FRM_TYPE_CONFIG = 2
 };
@@ -191,15 +187,18 @@ typedef struct anmed_codec_data
     unsigned			 enc_processed;
     AMediaCodecBufferInfo        enc_buf_info;
     int				 enc_output_buf_idx;
-    pj_bool_t                    enc_started;
 
     /* Decoder state */
     AMediaCodec                 *dec;
     pj_uint8_t			*dec_buf;
+    pj_uint8_t			*dec_input_buf;
+    unsigned			 dec_input_buf_len;
+    pj_size_t			 dec_input_buf_max_size;
+    pj_ssize_t			 dec_input_buf_idx;
+    unsigned			 dec_has_output_frame;
     unsigned			 dec_stride_len;
     unsigned			 dec_buf_size;
     AMediaCodecBufferInfo        dec_buf_info;
-    pj_bool_t                    dec_started;
 } anmed_codec_data;
 
 static pj_status_t configure_encoder(anmed_codec_data *anmed_data) {
@@ -207,9 +206,6 @@ static pj_status_t configure_encoder(anmed_codec_data *anmed_data) {
     AMediaFormat *vid_fmt;
     pjmedia_vid_codec_param *param = anmed_data->prm;
 
-    /*
-     * Configure encoder.
-     */
     vid_fmt = AMediaFormat_new();
     if (!vid_fmt) {
         return PJ_ENOMEM;
@@ -237,10 +233,13 @@ static pj_status_t configure_encoder(anmed_codec_data *anmed_data) {
                           (param->enc_fmt.det.vid.fps.num /
                            param->enc_fmt.det.vid.fps.denum));
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_LOW_LATENCY, 1);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_PRIORITY, 0);
 
-    PJ_LOG(4, (THIS_FILE, "Encoder configure format=%d, profile=%d, height=%d, width %d, bit_rate=%d, frame_rate=%d/%d ",
-	    ANMED_I420_PLANAR_FMT, 1, param->enc_fmt.det.vid.size.h, param->enc_fmt.det.vid.size.w,
-	    param->enc_fmt.det.vid.avg_bps, param->enc_fmt.det.vid.fps.num, param->enc_fmt.det.vid.fps.denum));
+//  PJ_LOG(5, (THIS_FILE, "Encoder configure format=%d, profile=%d, height=%d, "
+//	    "width %d, bit_rate=%d, frame_rate=%d/%d ",
+//	    ANMED_I420_PLANAR_FMT, 1, param->enc_fmt.det.vid.size.h,
+//	    param->enc_fmt.det.vid.size.w, param->enc_fmt.det.vid.avg_bps,
+//	    param->enc_fmt.det.vid.fps.num, param->enc_fmt.det.vid.fps.denum));
 
     /* Configure and start encoder. */
     am_status = AMediaCodec_configure(anmed_data->enc, vid_fmt, NULL, NULL,
@@ -253,12 +252,10 @@ static pj_status_t configure_encoder(anmed_codec_data *anmed_data) {
     }
     am_status = AMediaCodec_start(anmed_data->enc);
     if (am_status != AMEDIA_OK) {
-        PJ_LOG(4, (THIS_FILE, "Encoder start failed, status=%d", am_status));
-        return PJMEDIA_CODEC_EFAILED;
+	PJ_LOG(4, (THIS_FILE, "Encoder start failed, status=%d",
+		am_status));
+	return PJMEDIA_CODEC_EFAILED;
     }
-    anmed_data->enc_started = PJ_TRUE;
-    PJ_LOG(4, (THIS_FILE, "Encoder started"));
-
     return PJ_SUCCESS;
 }
 
@@ -268,6 +265,7 @@ static pj_status_t configure_decoder(anmed_codec_data *anmed_data) {
 
     vid_fmt = AMediaFormat_new();
     if (!vid_fmt) {
+	PJ_LOG(4, (THIS_FILE, "Decoder failed creating media format"));
         return PJ_ENOMEM;
     }
 
@@ -282,6 +280,7 @@ static pj_status_t configure_decoder(anmed_codec_data *anmed_data) {
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_MAX_INPUT_SZ, 0);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_ENCODER, 0);
     AMediaFormat_setInt32(vid_fmt, ANMED_KEY_LOW_LATENCY, 1);
+    AMediaFormat_setInt32(vid_fmt, ANMED_KEY_PRIORITY, 0);
 
     if (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_H264) {
 	AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_AVC_MIME_TYPE);
@@ -299,16 +298,10 @@ static pj_status_t configure_decoder(anmed_codec_data *anmed_data) {
 				       avc_data->dec_pps_len);
 	    }
 	}
-        PJ_LOG(4, (THIS_FILE, "Decoder configure using mime type=%s",
-        	   ANMED_AVC_MIME_TYPE));
     } else if (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_VP8) {
 	AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_VP8_MIME_TYPE);
-        PJ_LOG(4, (THIS_FILE, "Decoder configure using mime type=%s",
-        	ANMED_VP8_MIME_TYPE));
     } else if (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_VP9) {
 	AMediaFormat_setString(vid_fmt, ANMED_KEY_MIME, ANMED_VP9_MIME_TYPE);
-        PJ_LOG(4, (THIS_FILE, "Decoder configure using mime type=%s",
-        	ANMED_VP9_MIME_TYPE));
     }
     am_status = AMediaCodec_configure(anmed_data->dec, vid_fmt, NULL,
 				      NULL, 0);
@@ -320,15 +313,11 @@ static pj_status_t configure_decoder(anmed_codec_data *anmed_data) {
         return PJMEDIA_CODEC_EFAILED;
     }
 
-    if (!anmed_data->dec_started) {
-        am_status = AMediaCodec_start(anmed_data->dec);
-        if (am_status != AMEDIA_OK) {
-            PJ_LOG(4, (THIS_FILE, "Decoder start failed, status=%d",
-                       am_status));
-            return PJMEDIA_CODEC_EFAILED;
-        }
-        PJ_LOG(4, (THIS_FILE, "Decoder started"));
-        anmed_data->dec_started = PJ_TRUE;
+    am_status = AMediaCodec_start(anmed_data->dec);
+    if (am_status != AMEDIA_OK) {
+	PJ_LOG(4, (THIS_FILE, "Decoder start failed, status=%d",
+		   am_status));
+	return PJMEDIA_CODEC_EFAILED;
     }
     return PJ_SUCCESS;
 }
@@ -527,6 +516,54 @@ static pj_status_t anmed_enum_info(pjmedia_vid_codec_factory *factory,
     return PJ_SUCCESS;
 }
 
+static void create_codec(pj_uint32_t fmt_id,
+			 struct anmed_codec_data *anmed_data)
+{
+    char const *enc_name = NULL, *dec_name = NULL;
+    //char const *ANMED_OMX_AVC_ENCODER = "OMX.google.h264.encoder"; /*okay*/
+    char const *ANMED_OMX_AVC_ENCODER = "OMX.qcom.video.encoder.avc";
+    char const *ANMED_OMX_AVC_DECODER = "OMX.google.h264.decoder"; /*okay*/
+    //char const *ANMED_OMX_AVC_DECODER = "OMX.qcom.video.decoder.avc"; /*okay*/
+
+    //char const *ANMED_OMX_VP8_ENCODER = "OMX.google.vp8.encoder"; /*okay*/
+    char const *ANMED_OMX_VP8_ENCODER = "OMX.qcom.video.encoder.vp8";
+    //char const *ANMED_OMX_VP8_DECODER = "OMX.google.vp8.decoder";
+    char const *ANMED_OMX_VP8_DECODER = "OMX.qcom.video.decoder.vp8"; /*okay*/
+
+    //char const *ANMED_OMX_VP9_ENCODER = "OMX.google.vp9.encoder"; /*okay*/
+    char const *ANMED_OMX_VP9_ENCODER = "OMX.qcom.video.encoder.vp9";
+    //char const *ANMED_OMX_VP9_DECODER = "OMX.google.vp9.decoder";
+    char const *ANMED_OMX_VP9_DECODER = "OMX.qcom.video.decoder.vp9"; /*okay*/
+
+    switch (fmt_id) {
+    case PJMEDIA_FORMAT_H264:
+	enc_name = ANMED_OMX_AVC_ENCODER;
+	dec_name = ANMED_OMX_AVC_DECODER;
+	break;
+    case PJMEDIA_FORMAT_VP8:
+        enc_name = ANMED_OMX_VP8_ENCODER;
+        dec_name = ANMED_OMX_VP8_DECODER;
+	break;
+    case PJMEDIA_FORMAT_VP9:
+        enc_name = ANMED_OMX_VP9_ENCODER;
+        dec_name = ANMED_OMX_VP9_DECODER;
+    }
+
+    if (!anmed_data->enc) {
+	anmed_data->enc = AMediaCodec_createCodecByName(enc_name);
+	if (!anmed_data->enc) {
+	    PJ_LOG(4, (THIS_FILE, "Failed creating encoder: %s", enc_name));
+	}
+    }
+
+    if (!anmed_data->dec) {
+	anmed_data->dec = AMediaCodec_createCodecByName(dec_name);
+	if (!anmed_data->dec) {
+	    PJ_LOG(4, (THIS_FILE, "Failed creating decoder: %s", dec_name));
+	}
+    }
+}
+
 static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
                                      const pjmedia_vid_codec_info *info,
                                      pjmedia_vid_codec **p_codec)
@@ -534,13 +571,6 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     pj_pool_t *pool;
     pjmedia_vid_codec *codec;
     anmed_codec_data *anmed_data;
-    char const *enc_name = NULL, *dec_name = NULL;
-    char const *ANMED_OMX_AVC_ENCODER = "OMX.google.h264.encoder";
-    char const *ANMED_OMX_AVC_DECODER = "OMX.google.h264.decoder";
-    char const *ANMED_OMX_VP8_ENCODER = "OMX.google.vp8.encoder";
-    char const *ANMED_OMX_VP8_DECODER = "OMX.google.vp8.decoder";
-    char const *ANMED_OMX_VP9_ENCODER = "OMX.google.vp9.encoder";
-    char const *ANMED_OMX_VP9_DECODER = "OMX.google.vp9.decoder";
 
     PJ_ASSERT_RETURN(factory == &anmed_factory.base && info && p_codec,
                      PJ_EINVAL);
@@ -561,30 +591,10 @@ static pj_status_t anmed_alloc_codec(pjmedia_vid_codec_factory *factory,
     anmed_data->pool = pool;
     codec->codec_data = anmed_data;
 
-    if (info->fmt_id == PJMEDIA_FORMAT_H264) {
-	enc_name = ANMED_OMX_AVC_ENCODER;
-	dec_name = ANMED_OMX_AVC_DECODER;
-    } else if (info->fmt_id == PJMEDIA_FORMAT_VP8) {
-        enc_name = ANMED_OMX_VP8_ENCODER;
-        dec_name = ANMED_OMX_VP8_DECODER;
-    } else if (info->fmt_id == PJMEDIA_FORMAT_VP9) {
-        enc_name = ANMED_OMX_VP9_ENCODER;
-        dec_name = ANMED_OMX_VP9_DECODER;
-    }
-
-    anmed_data->enc = AMediaCodec_createCodecByName(enc_name);
-    if (!anmed_data->enc) {
-	PJ_LOG(4,(THIS_FILE, "Failed creating encoder: %s", enc_name));
+    create_codec(info->fmt_id, anmed_data);
+    if (!anmed_data->enc || !anmed_data->dec) {
 	goto on_error;
     }
-    PJ_LOG(4, (THIS_FILE, "Success creating encoder: %s", enc_name));
-
-    anmed_data->dec = AMediaCodec_createCodecByName(dec_name);
-    if (!anmed_data->dec) {
-	PJ_LOG(4,(THIS_FILE, "Failed creating decoder: %s", dec_name));
-	goto on_error;
-    }
-    PJ_LOG(4, (THIS_FILE, "Success creating decoder: %s", dec_name));
 
     *p_codec = codec;
     return PJ_SUCCESS;
@@ -615,8 +625,6 @@ static pj_status_t anmed_dealloc_codec(pjmedia_vid_codec_factory *factory,
         AMediaCodec_delete(anmed_data->dec);
         anmed_data->dec = NULL;
     }
-    anmed_data->enc_started = PJ_FALSE;
-    anmed_data->dec_started = PJ_FALSE;
     pj_pool_release(anmed_data->pool);
     return PJ_SUCCESS;
 }
@@ -647,6 +655,7 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
     if (param->enc_fmt.id == PJMEDIA_FORMAT_H264) {
         pjmedia_h264_packetizer_cfg  pktz_cfg;
         pjmedia_vid_codec_h264_fmtp  h264_fmtp;
+        avc_codec_data *avc_data;
 
         /* Parse remote fmtp */
         pj_bzero(&h264_fmtp, sizeof(h264_fmtp));
@@ -678,6 +687,12 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
         if (status != PJ_SUCCESS)
             return status;
 
+        avc_data = PJ_POOL_ZALLOC_T(anmed_data->pool, avc_codec_data);
+        if (!avc_data)
+            return PJ_ENOMEM;
+
+        anmed_data->ex_data = avc_data;
+
         /* If available, use the "sprop-parameter-sets" fmtp from remote SDP
          * to create the decoder.
          */
@@ -701,9 +716,6 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
             }
 
             if (i >= code_size) {
-                avc_codec_data *avc_data = PJ_POOL_ZALLOC_T(anmed_data->pool,
-                					    avc_codec_data);
-
                 avc_data->dec_sps_len = i + med_code_size - code_size;
                 avc_data->dec_pps_len = h264_fmtp.sprop_param_sets_len +
                                         med_code_size - code_size - i;
@@ -725,7 +737,6 @@ static pj_status_t anmed_codec_open(pjmedia_vid_codec *codec,
                 pj_memcpy(avc_data->dec_pps_buf + med_code_size,
                           &h264_fmtp.sprop_param_sets[i + code_size],
                           avc_data->dec_pps_len - med_code_size);
-                anmed_data->ex_data = avc_data;
             }
         }
     } else if ((param->enc_fmt.id == PJMEDIA_FORMAT_VP8) ||
@@ -805,11 +816,6 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 
     anmed_data = (anmed_codec_data*) codec->codec_data;
 
-    if (!anmed_data->enc_started) {
-        PJ_LOG(4,(THIS_FILE, "Codec not started"));
-        return PJMEDIA_CODEC_EFAILED;
-    }
-
     if (opt && opt->force_keyframe) {
 #if __ANDROID_API__ >=26
 	AMediaFormat *vid_fmt = NULL;
@@ -821,9 +827,13 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 	}
 	AMediaFormat_setInt32(vid_fmt, ANMED_KEY_REQUEST_SYNCF, 0);
 	am_status = AMediaCodec_setParameters(anmed_data->enc, vid_fmt);
+
+	if (am_status != AMEDIA_OK)
+	    PJ_LOG(4,(THIS_FILE, "Encoder [0] setParameters failed %d", am_status));
+
 	AMediaFormat_delete(vid_fmt);
 #else
-	PJ_LOG(4, (THIS_FILE, "Encoder cannot be forced to send keyframe"));
+	PJ_LOG(5, (THIS_FILE, "Encoder cannot be forced to send keyframe"));
 #endif
     }
 
@@ -837,14 +847,10 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 	if (input_buf && output_size >= input->size) {
 	    pj_memcpy(input_buf, input->buf, input->size);
 	    am_status = AMediaCodec_queueInputBuffer(anmed_data->enc,
-				    buf_idx,
-				    0,
-				    input->size,
-				    0,
-				    0);
+				    buf_idx, 0, input->size, 0, 0);
 	    if (am_status != AMEDIA_OK) {
-		TRACE_((THIS_FILE, "Encoder queueInputBuffer return %d",
-			am_status));
+		PJ_LOG(4, (THIS_FILE, "Encoder queueInputBuffer return %d",
+		           am_status));
 		goto on_return;
 	    }
 	} else {
@@ -854,7 +860,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 	    } else {
 		PJ_LOG(4,(THIS_FILE, "Encoder getInputBuffer "
 				     "size: %d, expecting %d.",
-			  input_buf, output_size, input->size));
+				     input_buf, output_size, input->size));
 	    }
 	    goto on_return;
 	}
@@ -868,39 +874,29 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 						  &anmed_data->enc_buf_info,
 						  CODEC_DEQUEUE_TIMEOUT);
 	if (buf_idx == -1) {
-            TRACE_((THIS_FILE, "Encoder dequeueOutputBuffer timeout[%d]",
-        	    i+1));
-            pj_thread_sleep(CODEC_THREAD_WAIT);
+	    /* Timeout, wait until output buffer is availble. */
+	    PJ_LOG(5, (THIS_FILE, "Encoder dequeueOutputBuffer timeout[%d]",
+		       i+1));
+	    pj_thread_sleep(CODEC_THREAD_WAIT);
 	} else {
 	    break;
 	}
     }
 
-    if (i == CODEC_WAIT_RETRY) {
-        PJ_LOG(4, (THIS_FILE, "Encoder dequeueOutputBuffer failed"));
-        goto on_return;
-    }
-
     if (buf_idx >= 0) {
         pj_size_t output_size;
+        media_status_t am_status;
         pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->enc,
                                                              buf_idx,
                                                              &output_size);
         if (!output_buf) {
-            PJ_LOG(4, (THIS_FILE, "Encoder output_buf:0x%x "
-		       "get output buffer size: %d, offset %d, flags %d",
-		       output_buf, anmed_data->enc_buf_info.size,
+            PJ_LOG(4, (THIS_FILE, "Encoder failed getting output buffer, "
+		       "buffer size %d, offset %d, flags %d",
+		       anmed_data->enc_buf_info.size,
 		       anmed_data->enc_buf_info.offset,
 		       anmed_data->enc_buf_info.flags));
             goto on_return;
         }
-
-//        PJ_LOG(4, (THIS_FILE, "Encoder GET output_buf:0x%x "
-//		       "get output buffer size: %d, offset %d, flags %d",
-//		       output_buf, anmed_data->enc_buf_info.size,
-//		       anmed_data->enc_buf_info.offset,
-//		       anmed_data->enc_buf_info.flags));
-
         anmed_data->enc_processed = 0;
         anmed_data->enc_frame_whole = output_buf;
         anmed_data->enc_output_buf_idx = buf_idx;
@@ -909,13 +905,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
         if (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_H264) {
 	    avc_codec_data *avc_data;
 
-	    if (!anmed_data->ex_data) {
-		avc_data = PJ_POOL_ZALLOC_T(anmed_data->pool, avc_codec_data);
-		anmed_data->ex_data = avc_data;
-	    } else {
-		avc_data = (avc_codec_data *)anmed_data->ex_data;
-	    }
-
+	    avc_data = (avc_codec_data *)anmed_data->ex_data;
             if (anmed_data->enc_buf_info.flags & ANMED_FRM_TYPE_CONFIG) {
 
 		/*
@@ -928,6 +918,13 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 		pj_memcpy(avc_data->enc_sps_pps_buf, output_buf,
 			  avc_data->enc_sps_pps_len);
 
+		am_status = AMediaCodec_releaseOutputBuffer(anmed_data->enc,
+						buf_idx,
+						0);
+
+		if (am_status != AMEDIA_OK) {
+		    PJ_LOG(4,(THIS_FILE, "Encoder [0] releaseOutputBuffer failed %d", am_status));
+		}
 		goto on_return;
             }
             if(anmed_data->enc_buf_info.flags & ANMED_FRM_TYPE_KEYFRAME) {
@@ -939,7 +936,6 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
         }
 
         if(anmed_data->enc_buf_info.flags & ANMED_FRM_TYPE_KEYFRAME) {
-            TRACE_((THIS_FILE, "KEYFRAME DETECTED"));
             output->bit_info |= PJMEDIA_VID_FRM_KEYFRAME;
         }
 
@@ -971,37 +967,45 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
         	      anmed_data->enc_frame_whole,
         	      anmed_data->enc_buf_info.size);
 
-	    AMediaCodec_releaseOutputBuffer(anmed_data->enc,
+	    am_status = AMediaCodec_releaseOutputBuffer(anmed_data->enc,
 					    buf_idx,
 					    0);
+
+	    if (am_status != AMEDIA_OK) {
+		PJ_LOG(4,(THIS_FILE, "Encoder [1] releaseOutputBuffer failed %d", am_status));
+	    }
 
             return PJ_SUCCESS;
         }
     } else {
-        TRACE_((THIS_FILE, "Encoder dequeueOutputBuffer return %d index",
-                buf_idx));
-
+	media_status_t am_status;
         if (buf_idx == -2) {
 	    int width, height, color_fmt, stride;
 
 	    /* Format change. */
-	    AMediaFormat *vid_fmt = AMediaCodec_getOutputFormat(anmed_data->enc);
+	    AMediaFormat *vid_fmt = AMediaCodec_getOutputFormat(
+							       anmed_data->enc);
 
 	    AMediaFormat_getInt32(vid_fmt, ANMED_KEY_WIDTH, &width);
 	    AMediaFormat_getInt32(vid_fmt, ANMED_KEY_HEIGHT, &height);
 	    AMediaFormat_getInt32(vid_fmt, ANMED_KEY_COLOR_FMT, &color_fmt);
 	    AMediaFormat_getInt32(vid_fmt, ANMED_KEY_STRIDE, &stride);
-	    TRACE_((THIS_FILE, "Encoder detect new width %d, height %d, "
-		    "color_fmt 0x%X, stride %d buf_size %d",
-		    width, height, color_fmt, stride,
-		    anmed_data->enc_buf_info.size));
+	    PJ_LOG(5, (THIS_FILE, "Encoder detect new width %d, height %d, "
+		       "color_fmt 0x%X, stride %d buf_size %d",
+		       width, height, color_fmt, stride,
+		       anmed_data->enc_buf_info.size));
 
 	    AMediaFormat_delete(vid_fmt);
-	    anmed_data->dec_stride_len = stride;
+        } else {
+	    PJ_LOG(4, (THIS_FILE, "Encoder dequeueOutputBuffer failed[%d]",
+		       buf_idx));
         }
-	AMediaCodec_releaseOutputBuffer(anmed_data->enc,
+	am_status = AMediaCodec_releaseOutputBuffer(anmed_data->enc,
 					buf_idx,
 					0);
+	if (am_status != AMEDIA_OK) {
+	    PJ_LOG(4,(THIS_FILE, "Encoder [3] releaseOutputBuffer failed %d", am_status));
+	}
         goto on_return;
     }
 
@@ -1066,7 +1070,6 @@ static pj_status_t avc_encode_more(anmed_codec_data *anmed_data,
     output->size = payload_len;
 
     if (anmed_data->enc_processed >= anmed_data->enc_frame_size) {
-	*has_more = PJ_FALSE;
 	avc_codec_data *avc_data = (avc_codec_data *)anmed_data->ex_data;
 
 	if (avc_data->enc_sps_pps_ex) {
@@ -1074,6 +1077,15 @@ static pj_status_t avc_encode_more(anmed_codec_data *anmed_data,
 	    avc_data->enc_sps_pps_ex = PJ_FALSE;
 	    anmed_data->enc_processed = 0;
 	    anmed_data->enc_frame_size = anmed_data->enc_buf_info.size;
+	} else {
+	    media_status_t am_status;
+	    *has_more = PJ_FALSE;
+	    am_status = AMediaCodec_releaseOutputBuffer(anmed_data->enc,
+					    anmed_data->enc_output_buf_idx,
+					    0);
+	    if (am_status != AMEDIA_OK) {
+		PJ_LOG(4,(THIS_FILE, "Encoder [4] releaseOutputBuffer failed %d", am_status));
+	    }
 	}
     } else {
 	*has_more = PJ_TRUE;
@@ -1112,7 +1124,6 @@ static pj_status_t vpx_encode_more(anmed_codec_data *anmed_data,
 	if (payload_len + payload_desc_size > out_size)
 	    return PJMEDIA_CODEC_EFRMTOOSHORT;
 
-        //output->timestamp = vpx_data->ets;
         output->type = PJMEDIA_FRAME_TYPE_VIDEO;
         output->bit_info = 0;
 
@@ -1238,6 +1249,206 @@ static int write_yuv(pj_uint8_t *buf,
     return dst - buf;
 }
 
+static void anmed_get_input_buffer(struct anmed_codec_data *anmed_data)
+{
+    pj_ssize_t buf_idx = -1;
+
+    buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->dec,
+					     CODEC_DEQUEUE_TIMEOUT);
+
+    if (buf_idx < 0) {
+	PJ_LOG(4,(THIS_FILE, "Decoder dequeueInputBuffer failed return %d",
+		  buf_idx));
+    }
+
+    if (buf_idx < 0) {
+	anmed_data->dec_input_buf = NULL;
+
+	if (buf_idx == -10000) {
+	    PJ_LOG(5, (THIS_FILE, "Resetting decoder"));
+	    AMediaCodec_stop(anmed_data->dec);
+	    AMediaCodec_delete(anmed_data->dec);
+	    anmed_data->dec = NULL;
+
+	    create_codec(anmed_data->prm->enc_fmt.id, anmed_data);
+	    if (anmed_data->dec)
+		configure_decoder(anmed_data);
+	}
+	return;
+    }
+
+    anmed_data->dec_input_buf_len = 0;
+    anmed_data->dec_input_buf_idx = buf_idx;
+    anmed_data->dec_input_buf = AMediaCodec_getInputBuffer(anmed_data->dec,
+				       buf_idx,
+				       &anmed_data->dec_input_buf_max_size);
+}
+
+static pj_status_t anmed_decode(pjmedia_vid_codec *codec,
+			        struct anmed_codec_data *anmed_data,
+			        pj_uint8_t *input_buf, unsigned buf_size,
+			        int buf_flag, pj_timestamp *input_ts,
+			        pj_bool_t write_output, pjmedia_frame *output)
+{
+    pj_ssize_t buf_idx = 0;
+    pj_status_t status = PJ_SUCCESS;
+    media_status_t am_status;
+
+    if ((anmed_data->dec_input_buf_max_size > 0) &&
+	(anmed_data->dec_input_buf_len + buf_size >
+         anmed_data->dec_input_buf_max_size))
+    {
+	am_status = AMediaCodec_queueInputBuffer(anmed_data->dec,
+					         anmed_data->dec_input_buf_idx,
+					         0,
+					         anmed_data->dec_input_buf_len,
+					         input_ts->u32.lo,
+					         buf_flag);
+	if (am_status != AMEDIA_OK) {
+	    PJ_LOG(4,(THIS_FILE, "Decoder queueInputBuffer idx[%d] return %d",
+		    anmed_data->dec_input_buf_idx, am_status));
+	    return status;
+	}
+	anmed_data->dec_input_buf = NULL;
+    }
+
+    if (anmed_data->dec_input_buf == NULL)
+    {
+	anmed_get_input_buffer(anmed_data);
+
+	if (anmed_data->dec_input_buf == NULL) {
+	    PJ_LOG(4,(THIS_FILE, "Decoder failed getting input buffer"));
+	    return status;
+	}
+    }
+//    PJ_LOG(4,(THIS_FILE, "Decoder queueInputBuffer dec_input_buf_len[%d] "
+//	    "buf_size[%d] buf_idx[%d] max_size[%d] ts[%d] write_output[%d]",
+//	    anmed_data->dec_input_buf_len, buf_size,
+//	    anmed_data->dec_input_buf_idx, anmed_data->dec_input_buf_max_size,
+//	    input_ts->u32.lo, write_output));
+    pj_memcpy(anmed_data->dec_input_buf + anmed_data->dec_input_buf_len,
+	      input_buf, buf_size);
+
+    anmed_data->dec_input_buf_len += buf_size;
+
+    if (!write_output)
+	return status;
+
+    am_status = AMediaCodec_queueInputBuffer(anmed_data->dec,
+					     anmed_data->dec_input_buf_idx,
+					     0,
+					     anmed_data->dec_input_buf_len,
+					     input_ts->u32.lo,
+					     buf_flag);
+    if (am_status != AMEDIA_OK) {
+	PJ_LOG(4,(THIS_FILE, "Decoder queueInputBuffer failed return %d",
+		  am_status));
+	anmed_data->dec_input_buf = NULL;
+	return status;
+    }
+    anmed_data->dec_input_buf_len += buf_size;
+
+    buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->dec,
+					      &anmed_data->dec_buf_info,
+					      CODEC_DEQUEUE_TIMEOUT);
+
+    if (buf_idx >= 0) {
+	pj_size_t output_size;
+	int len;
+
+	pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->dec,
+							     buf_idx,
+							     &output_size);
+	if (output_buf == NULL) {
+	    am_status = AMediaCodec_releaseOutputBuffer(anmed_data->dec,
+					    buf_idx,
+					    0);
+	    PJ_LOG(4,(THIS_FILE, "Decoder getOutputBuffer failed"));
+	    if (am_status != AMEDIA_OK) {
+		PJ_LOG(4,(THIS_FILE, "Decoder [0] releaseOutputBuffer failed %d", am_status));
+	    }
+
+	    return status;
+	}
+	len = write_yuv((pj_uint8_t *)output->buf,
+			anmed_data->dec_buf_info.size,
+			output_buf,
+			anmed_data->dec_stride_len,
+			anmed_data->prm->dec_fmt.det.vid.size.w,
+			anmed_data->prm->dec_fmt.det.vid.size.h);
+
+	am_status = AMediaCodec_releaseOutputBuffer(anmed_data->dec,
+					buf_idx,
+					0);
+
+	if (am_status != AMEDIA_OK) {
+	    PJ_LOG(4,(THIS_FILE, "Decoder [1] releaseOutputBuffer failed %d", am_status));
+	}
+
+	if (len > 0) {
+	    if (!anmed_data->dec_has_output_frame) {
+		output->type = PJMEDIA_FRAME_TYPE_VIDEO;
+		output->size = len;
+		output->timestamp = *input_ts;
+
+		anmed_data->dec_has_output_frame = PJ_TRUE;
+	    }
+	} else {
+	    status = PJMEDIA_CODEC_EFRMTOOSHORT;
+	}
+    } else if (buf_idx == -2) {
+	int width, height, stride;
+	AMediaFormat *vid_fmt;
+	/* Get output format */
+	vid_fmt = AMediaCodec_getOutputFormat(anmed_data->dec);
+
+	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_WIDTH, &width);
+	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_HEIGHT, &height);
+	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_STRIDE, &stride);
+
+	AMediaFormat_delete(vid_fmt);
+	anmed_data->dec_stride_len = stride;
+	if (width != anmed_data->prm->dec_fmt.det.vid.size.w ||
+	    height != anmed_data->prm->dec_fmt.det.vid.size.h)
+	{
+	    pjmedia_event event;
+
+	    anmed_data->prm->dec_fmt.det.vid.size.w = width;
+	    anmed_data->prm->dec_fmt.det.vid.size.h = height;
+
+	    PJ_LOG(4,(THIS_FILE, "Frame size changed to %dx%d",
+		      anmed_data->prm->dec_fmt.det.vid.size.w,
+		      anmed_data->prm->dec_fmt.det.vid.size.h));
+
+	    /* Broadcast format changed event */
+	    pjmedia_event_init(&event, PJMEDIA_EVENT_FMT_CHANGED,
+			       &output->timestamp, codec);
+	    event.data.fmt_changed.dir = PJMEDIA_DIR_DECODING;
+	    pjmedia_format_copy(&event.data.fmt_changed.new_fmt,
+				&anmed_data->prm->dec_fmt);
+	    pjmedia_event_publish(NULL, codec, &event,
+				  PJMEDIA_EVENT_PUBLISH_DEFAULT);
+	}
+	am_status = AMediaCodec_releaseOutputBuffer(anmed_data->dec,
+					buf_idx,
+					0);
+
+	if (am_status != AMEDIA_OK) {
+	    PJ_LOG(4,(THIS_FILE, "Decoder [2] releaseOutputBuffer failed %d", am_status));
+	}
+    } else {
+	PJ_LOG(4,(THIS_FILE, "Decoder dequeueOutputBuffer failed [%d]",
+		  buf_idx));
+//	am_status = AMediaCodec_releaseOutputBuffer(anmed_data->dec,
+//					buf_idx,
+//					0);
+//	if (am_status != AMEDIA_OK) {
+//	    PJ_LOG(4,(THIS_FILE, "Decoder [3] releaseOutputBuffer failed %d", am_status));
+//	}
+    }
+    return status;
+}
+
 static pj_status_t avc_decode(pjmedia_vid_codec *codec,
 			      pj_size_t count,
 			      pjmedia_frame packets[],
@@ -1250,7 +1461,6 @@ static pj_status_t avc_decode(pjmedia_vid_codec *codec,
     unsigned buf_pos, whole_len = 0;
     unsigned i, frm_cnt;
     pj_status_t status;
-    pj_ssize_t buf_idx;
 
     PJ_ASSERT_RETURN(codec && count && packets && out_size && output,
                      PJ_EINVAL);
@@ -1258,10 +1468,6 @@ static pj_status_t avc_decode(pjmedia_vid_codec *codec,
 
     anmed_data = (anmed_codec_data*) codec->codec_data;
 
-    if (!anmed_data->dec_started) {
-        PJ_LOG(4, (THIS_FILE, "Decoder not started!!"));
-        goto on_return;
-    }
     /*
      * Step 1: unpacketize the packets/frames
      */
@@ -1319,7 +1525,8 @@ static pj_status_t avc_decode(pjmedia_vid_codec *codec,
      */
     buf_pos = 0;
     for ( frm_cnt=0; ; ++frm_cnt) {
-	uint32_t frm_size, nalu_type;
+	uint32_t frm_size;
+	pj_bool_t write_output = PJ_FALSE;
 	unsigned char *start;
 
 	for (i = code_size - 1; buf_pos + i < whole_len; i++) {
@@ -1334,155 +1541,21 @@ static pj_status_t avc_decode(pjmedia_vid_codec *codec,
 
 	frm_size = i;
 	start = anmed_data->dec_buf + buf_pos;
-	nalu_type = (start[code_size] & 0x1F);
+	write_output = (buf_pos + frm_size >= whole_len);
 
-	buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->dec,
-						 CODEC_DEQUEUE_TIMEOUT);
-	if (buf_idx >= 0) {
-	    pj_size_t output_size;
-	    pj_uint8_t *input_buf =
-			AMediaCodec_getInputBuffer(anmed_data->dec,
-						   buf_idx,
-						   &output_size);
+	status = anmed_decode(codec, anmed_data, start, frm_size, 0,
+		              &packets[0].timestamp, write_output, output);
+	if (status != PJ_SUCCESS)
+	    return status;
 
-	    if (input_buf && (output_size >= frm_size)) {
-		int buf_flag;
-		media_status_t am_status;
-
-		pj_memcpy(input_buf, start, frm_size);
-		switch (nalu_type) {
-		case 7:
-		case 8:
-		    buf_flag = 2;
-		    break;
-		case 5:
-		    buf_flag = 1;
-		    break;
-		default:
-		    buf_flag = 0;
-		}
-		am_status =
-			  AMediaCodec_queueInputBuffer(anmed_data->dec,
-						       buf_idx,
-						       0,
-						       frm_size,
-						       0,
-						       buf_flag);
-		if (am_status != AMEDIA_OK) {
-		    PJ_LOG(4,(THIS_FILE, "Decoder queueInputBuffer "
-				       "err return %d", am_status));
-		    goto on_return;
-		}
-	    } else {
-		if (!input_buf) {
-		    PJ_LOG(4,(THIS_FILE, "Decoder getInputBuffer "
-			      "returns no input buffer"));
-		} else {
-		    PJ_LOG(4,(THIS_FILE, "Decoder getInputBuffer "
-			      "size: %d, expecting %d.",
-			      input_buf, output_size, frm_size));
-		}
-		goto on_return;
-	    }
-	} else {
-	    PJ_LOG(4, (THIS_FILE, "Decoder dequeueInputBuffer failed[%d]",
-		   buf_idx));
-	}
-
-	if (buf_pos + frm_size >= whole_len)
+	if (write_output)
 	    break;
 
 	buf_pos += frm_size;
     }
 
-    for (i = 0; i < CODEC_WAIT_RETRY; ++i) {
-	buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->dec,
-						  &anmed_data->dec_buf_info,
-						  CODEC_DEQUEUE_TIMEOUT);
-	if (buf_idx == -1) {
-	    TRACE_((THIS_FILE, "Decoder dequeueOutputBuffer timeout[%d]", i+1));
-	    pj_thread_sleep(CODEC_THREAD_WAIT);
-	} else {
-	    break;
-	}
-    }
-
-    if (i == CODEC_WAIT_RETRY) {
-	PJ_LOG(4,(THIS_FILE, "Decoder dequeueOutputBuffer failed"));
-	goto on_return;
-    }
-
-    if (buf_idx >= 0) {
-	int len;
-	pj_size_t output_size;
-	pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->dec,
-							     buf_idx,
-							     &output_size);
-	if (!output_buf) {
-	    PJ_LOG(4, (THIS_FILE, "Decoder cannot get output buffer."));
-	    goto on_return;
-	}
-
-	len = write_yuv((pj_uint8_t *)output->buf,
-			anmed_data->dec_buf_info.size,
-			output_buf,
-			anmed_data->dec_stride_len,
-			anmed_data->prm->dec_fmt.det.vid.size.w,
-			anmed_data->prm->dec_fmt.det.vid.size.h);
-
-	AMediaCodec_releaseOutputBuffer(anmed_data->dec,
-					buf_idx,
-					0);
-	if (len > 0) {
-	    output->type = PJMEDIA_FRAME_TYPE_VIDEO;
-	    output->size = len;
-	    output->timestamp = packets[0].timestamp;
-	} else {
-	    output->size = 0;
-	    return PJMEDIA_CODEC_EFRMTOOSHORT;
-	}
-    } else if (buf_idx == -2) {
-	int width, height, color_fmt, stride;
-
-	/* Format change. */
-	AMediaFormat *vid_fmt = AMediaCodec_getOutputFormat(anmed_data->dec);
-
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_WIDTH, &width);
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_HEIGHT, &height);
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_COLOR_FMT, &color_fmt);
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_STRIDE, &stride);
-	TRACE_((THIS_FILE, "Decoder detect new width %d, height %d, "
-		"color_fmt 0x%X, stride %d buf_size %d",
-		width, height, color_fmt, stride,
-		anmed_data->dec_buf_info.size));
-
-	AMediaFormat_delete(vid_fmt);
-	anmed_data->dec_stride_len = stride;
-	if (width != anmed_data->prm->dec_fmt.det.vid.size.w ||
-	    height != anmed_data->prm->dec_fmt.det.vid.size.h)
-	{
-	    pjmedia_event event;
-
-	    anmed_data->prm->dec_fmt.det.vid.size.w = width;
-	    anmed_data->prm->dec_fmt.det.vid.size.h = height;
-
-	    PJ_LOG(4,(THIS_FILE, "Frame size changed to %dx%d",
-		      anmed_data->prm->dec_fmt.det.vid.size.w,
-		      anmed_data->prm->dec_fmt.det.vid.size.h));
-
-	    /* Broadcast format changed event */
-	    pjmedia_event_init(&event, PJMEDIA_EVENT_FMT_CHANGED,
-			       &output->timestamp, codec);
-	    event.data.fmt_changed.dir = PJMEDIA_DIR_DECODING;
-	    pjmedia_format_copy(&event.data.fmt_changed.new_fmt,
-				&anmed_data->prm->dec_fmt);
-	    pjmedia_event_publish(NULL, codec, &event,
-				  PJMEDIA_EVENT_PUBLISH_DEFAULT);
-	}
-	goto on_return;
-    } else {
-	PJ_LOG(4, (THIS_FILE, "Decoder dequeueOutputBuffer return %d index",
-	       buf_idx));
+    if (!anmed_data->dec_has_output_frame) {
+	PJ_LOG(4,(THIS_FILE, "Decoder couldn't produce output frame"));
 	goto on_return;
     }
 
@@ -1602,8 +1675,8 @@ static pj_status_t vpx_decode(pjmedia_vid_codec *codec,
 			      pjmedia_frame *output)
 {
     anmed_codec_data *anmed_data;
-    unsigned i;
-    pj_ssize_t buf_idx;
+    unsigned i, whole_len = 0;
+    pj_status_t status;
 
     PJ_ASSERT_RETURN(codec && count && packets && out_size && output,
                      PJ_EINVAL);
@@ -1617,201 +1690,64 @@ static pj_status_t vpx_decode(pjmedia_vid_codec *codec,
         goto on_return;
     }
 
-    if (!anmed_data->dec_started) {
-        PJ_LOG(4, (THIS_FILE, "Decoder not started!!"));
-        goto on_return;
-    }
-
-    for (i = 0; i < count; ++i) {
-	unsigned desc_len = 0;
-	unsigned j = 0;
-	unsigned packet_size = packets[i].size;
-	pj_status_t status;
-	pj_bool_t is_keyframe = PJ_FALSE;
-	pj_uint8_t *p = (pj_uint8_t *)packets[i].buf;
-
-	if (!anmed_data->whole) {
-	    status = vpx_unpacketize(anmed_data, (pj_uint8_t*)packets[i].buf,
-				     packet_size, &desc_len);
-	    if (status != PJ_SUCCESS) {
-		PJ_LOG(4,(THIS_FILE, "Unpacketize error"));
-		return status;
+    whole_len = 0;
+    if (anmed_data->whole) {
+	for (i = 0; i < count; ++i) {
+	    if (whole_len + packets[i].size > anmed_data->dec_buf_size) {
+		PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow [1]"));
+		return PJMEDIA_CODEC_EFRMTOOSHORT;
 	    }
-	    packet_size -= desc_len;
+
+	    pj_memcpy( anmed_data->dec_buf + whole_len,
+	               (pj_uint8_t*)packets[i].buf,
+	               packets[i].size);
+	    whole_len += packets[i].size;
 	}
 
-	if (packet_size > anmed_data->dec_buf_size) {
-	    PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow [2]"));
-	    return PJMEDIA_CODEC_EFRMTOOSHORT;
-	}
-
-//	{
-//	    pj_uint8_t *q;
-//	    unsigned j;
-//	    q = (pj_uint8_t *)packets[i].buf;
-//	    for (j=0; j<5 && i<packets[i].size ;++j, ++q) {
-//		PJ_LOG(4,(THIS_FILE, "Decoding unpacket[%d] data[%d] = 0x%02X", i, j, *q));
-//	    }
-//	}
-
-	if (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_VP8) {
-	    is_keyframe = ((p[0] & 0x20) == 0);
-	} else if (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_VP9) {
-	    is_keyframe = ((p[0] & 0x40) == 0);
-	}
-
-	PJ_LOG(4,(THIS_FILE, "Decoding packet[%d] total %d, KEYFRAME=%d, header=0x%02X, size=%d", i+1, count, is_keyframe, p[0], packets[i].size));
-
-	for (j = 0; j < CODEC_WAIT_RETRY; ++j) {
-	    buf_idx = AMediaCodec_dequeueInputBuffer(anmed_data->dec,
-						     CODEC_DEQUEUE_TIMEOUT);
-
-	    PJ_LOG(4,(THIS_FILE, "Decoder dequeueInputBuffer returns buf_idx=%d", buf_idx));
-	    if (buf_idx >= 0) {
-		pj_size_t output_size;
-		pj_uint8_t *input_buf =
-			    AMediaCodec_getInputBuffer(anmed_data->dec,
-						       buf_idx,
-						       &output_size);
-
-		if (input_buf && (output_size >= packet_size)) {
-		    int buf_flag;
-		    media_status_t am_status;
-
-		    PJ_LOG(4,(THIS_FILE, "Decoder getInputBuffer returns buf=0x%x, size=%d", input_buf, output_size));
-
-		    pj_memcpy(input_buf, (char *)packets[i].buf + desc_len,
-			      packet_size);
-		    buf_flag = is_keyframe;
-
-		    am_status =
-			      AMediaCodec_queueInputBuffer(anmed_data->dec,
-							   buf_idx,
-							   0,
-							   packet_size,
-							   0,
-							   buf_flag);
-		    if (am_status != AMEDIA_OK) {
-			PJ_LOG(4,(THIS_FILE, "Decoder queueInputBuffer "
-					   "err return %d", am_status));
-			goto on_return;
-		    }
-		    break;
-		} else {
-		    PJ_LOG(4,(THIS_FILE, "Decoder getInputBuffer fails buf=0x%x, size=%d, packet_size=%d", input_buf, output_size, packet_size));
-
-		    if (!input_buf) {
-			PJ_LOG(4,(THIS_FILE, "Decoder getInputBuffer "
-				  "returns no input buffer"));
-		    } else {
-			PJ_LOG(4,(THIS_FILE, "Decoder getInputBuffer "
-				  "size: %d, expecting %d.",
-				  input_buf, output_size, packet_size));
-		    }
-		    goto on_return;
-		}
-	    } else {
-		TRACE_((THIS_FILE, "Decoder skipped frame[%d/%d], i, count",
-			j+1));
-		break;
-	    }
-	}
-
-	if (i == CODEC_WAIT_RETRY) {
-	    PJ_LOG(4,(THIS_FILE, "Failed decoding"));
-	    goto on_return;
-	}
-    }
-
-    PJ_LOG(4,(THIS_FILE, "Decoder dequeueOutputBuffer"));
-    for (i = 0; i < CODEC_WAIT_RETRY; ++i) {
-	buf_idx = AMediaCodec_dequeueOutputBuffer(anmed_data->dec,
-						  &anmed_data->dec_buf_info,
-						  CODEC_DEQUEUE_TIMEOUT);
-	if (buf_idx == -1) {
-	    TRACE_((THIS_FILE, "Decoder dequeueOutputBuffer timeout[%d]", i+1));
-	    pj_thread_sleep(CODEC_THREAD_WAIT);
-	} else {
-	    break;
-	}
-    }
-
-    if (i == CODEC_WAIT_RETRY) {
-	PJ_LOG(4,(THIS_FILE, "Decoder dequeueOutputBuffer failed"));
-	goto on_return;
-    }
-
-    if (buf_idx >= 0) {
-	int len;
-	pj_size_t output_size;
-	pj_uint8_t *output_buf = AMediaCodec_getOutputBuffer(anmed_data->dec,
-							     buf_idx,
-							     &output_size);
-	if (!output_buf) {
-	    PJ_LOG(4, (THIS_FILE, "Decoder cannot get output buffer."));
-	    goto on_return;
-	}
-
-	len = write_yuv((pj_uint8_t *)output->buf,
-			anmed_data->dec_buf_info.size,
-			output_buf,
-			anmed_data->dec_stride_len,
-			anmed_data->prm->dec_fmt.det.vid.size.w,
-			anmed_data->prm->dec_fmt.det.vid.size.h);
-
-	AMediaCodec_releaseOutputBuffer(anmed_data->dec,
-					buf_idx,
-					0);
-	if (len > 0) {
-	    output->type = PJMEDIA_FRAME_TYPE_VIDEO;
-	    output->size = len;
-	    output->timestamp = packets[0].timestamp;
-	} else {
-	    output->size = 0;
-	    return PJMEDIA_CODEC_EFRMTOOSHORT;
-	}
-    } else if (buf_idx == -2) {
-	int width, height, color_fmt, stride;
-
-	/* Format change. */
-	AMediaFormat *vid_fmt = AMediaCodec_getOutputFormat(anmed_data->dec);
-
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_WIDTH, &width);
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_HEIGHT, &height);
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_COLOR_FMT, &color_fmt);
-	AMediaFormat_getInt32(vid_fmt, ANMED_KEY_STRIDE, &stride);
-	TRACE_((THIS_FILE, "Decoder detect new width %d, height %d, "
-		"color_fmt 0x%X, stride %d buf_size %d",
-		width, height, color_fmt, stride,
-		anmed_data->dec_buf_info.size));
-
-	AMediaFormat_delete(vid_fmt);
-	anmed_data->dec_stride_len = stride;
-	if (width != anmed_data->prm->dec_fmt.det.vid.size.w ||
-	    height != anmed_data->prm->dec_fmt.det.vid.size.h)
-	{
-	    pjmedia_event event;
-
-	    anmed_data->prm->dec_fmt.det.vid.size.w = width;
-	    anmed_data->prm->dec_fmt.det.vid.size.h = height;
-
-	    PJ_LOG(4,(THIS_FILE, "Frame size changed to %dx%d",
-		      anmed_data->prm->dec_fmt.det.vid.size.w,
-		      anmed_data->prm->dec_fmt.det.vid.size.h));
-
-	    /* Broadcast format changed event */
-	    pjmedia_event_init(&event, PJMEDIA_EVENT_FMT_CHANGED,
-			       &output->timestamp, codec);
-	    event.data.fmt_changed.dir = PJMEDIA_DIR_DECODING;
-	    pjmedia_format_copy(&event.data.fmt_changed.new_fmt,
-				&anmed_data->prm->dec_fmt);
-	    pjmedia_event_publish(NULL, codec, &event,
-				  PJMEDIA_EVENT_PUBLISH_DEFAULT);
-	}
-	goto on_return;
     } else {
-	PJ_LOG(4, (THIS_FILE, "Decoder dequeueOutputBuffer return %d index",
-	       buf_idx));
+    	for (i = 0; i < count; ++i) {
+    	    unsigned desc_len;
+    	    unsigned packet_size = packets[i].size;
+    	    pj_status_t status;
+
+    	    status = vpx_unpacketize(anmed_data, (pj_uint8_t *)packets[i].buf,
+    				     packet_size, &desc_len);
+    	    if (status != PJ_SUCCESS) {
+	    	PJ_LOG(4,(THIS_FILE, "Unpacketize error packet size[%d]",
+	    		  packet_size));
+	    	return status;
+    	    }
+
+    	    packet_size -= desc_len;
+    	    if (whole_len + packet_size > anmed_data->dec_buf_size) {
+	    	PJ_LOG(4,(THIS_FILE, "Decoding buffer overflow [2]"));
+	    	return PJMEDIA_CODEC_EFRMTOOSHORT;
+            }
+
+	    pj_memcpy(anmed_data->dec_buf + whole_len,
+		      (char *)packets[i].buf + desc_len, packet_size);
+
+	    whole_len += packet_size;
+    	}
+    }
+
+    status = anmed_decode(codec, anmed_data, anmed_data->dec_buf,
+			  whole_len, 0, &packets[0].timestamp,
+			  PJ_TRUE, output);
+
+    if (status != PJ_SUCCESS)
+	return status;
+
+    if (!anmed_data->dec_has_output_frame) {
+	pjmedia_event event;
+
+	/* Broadcast missing keyframe event */
+	pjmedia_event_init(&event, PJMEDIA_EVENT_KEYFRAME_MISSING,
+	                   &packets[0].timestamp, codec);
+	pjmedia_event_publish(NULL, codec, &event,
+	                      PJMEDIA_EVENT_PUBLISH_DEFAULT);
+
+	PJ_LOG(4,(THIS_FILE, "Decoder couldn't produce output frame"));
 	goto on_return;
     }
 
@@ -1837,6 +1773,9 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
     PJ_ASSERT_RETURN(output->buf, PJ_EINVAL);
 
     anmed_data = (anmed_codec_data*) codec->codec_data;
+    anmed_data->dec_has_output_frame = PJ_FALSE;
+    anmed_data->dec_input_buf = NULL;
+    anmed_data->dec_input_buf_len = 0;
 
     if (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_H264) {
 	return avc_decode(codec, count, packets, out_size, output);
@@ -1844,11 +1783,11 @@ static pj_status_t anmed_codec_decode(pjmedia_vid_codec *codec,
 	       (anmed_data->prm->enc_fmt.id == PJMEDIA_FORMAT_VP9))
     {
 	return vpx_decode(codec, count, packets, out_size, output);
-//	    output->type = PJMEDIA_FRAME_TYPE_NONE;
-//	    output->size = 0;
-//	    output->timestamp = packets[0].timestamp;
-//	    return PJ_SUCCESS;
     }
+    output->type = PJMEDIA_FRAME_TYPE_NONE;
+    output->size = 0;
+    output->timestamp = packets[0].timestamp;
+    return PJ_SUCCESS;
 }
 
 #endif	/* PJMEDIA_HAS_ANDROID_MEDIACODEC */

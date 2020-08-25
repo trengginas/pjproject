@@ -16,30 +16,30 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#ifndef __PJMEDIA_CODEC_VID_TOOLBOX_H__
-#define __PJMEDIA_CODEC_VID_TOOLBOX_H__
+#ifndef __PJMEDIA_CODEC_AND_MEDIACODEC_H__
+#define __PJMEDIA_CODEC_AND_MEDIACODEC_H__
 
 #include <pjmedia-codec/types.h>
 #include <pjmedia/vid_codec.h>
 
 /**
- * @file pjmedia-codec/vid_toolbox.h
- * @brief Video Toolbox codec
+ * @file pjmedia-codec/and_meidacodec.h
+ * @brief Android Mediacodec codec
  */
 
 
 PJ_BEGIN_DECL
 
 /**
- * @defgroup PJMEDIA_CODEC_VID_TOOLBOX Video Toolbox Codec
+ * @defgroup PJMEDIA_HAS_ANDROID_MEDIACODEC Android Mediacodec Codec
  * @ingroup PJMEDIA_CODEC_VID_CODECS
  * @{
  *
- * Video Toolbox H.264 codec wrapper for Mac and iOS.
+ * Android Mediacodec (AVC/H264+VP8+VP9) codec wrapper for Android.
  */
 
 /**
- * Initialize and register Video Toolbox codec factory.
+ * Initialize and register Android Mediacodec codec factory.
  *
  * @param mgr	    The video codec manager instance where this codec will
  * 		    be registered to. Specify NULL to use default instance
@@ -50,11 +50,11 @@ PJ_BEGIN_DECL
  * @return	    PJ_SUCCESS on success.
  */
 PJ_DECL(pj_status_t) pjmedia_codec_anmed_vid_init(pjmedia_vid_codec_mgr *mgr,
-                                                     pj_pool_factory *pf);
+                                                  pj_pool_factory *pf);
 
 /**
- * Unregister Video Toolbox video codecs factory from the video codec manager
- * and deinitialize the codec library.
+ * Unregister Android Mediacodec video codecs factory from the video codec
+ * manager and deinitialize the codec library.
  *
  * @return	    PJ_SUCCESS on success.
  */
@@ -62,10 +62,10 @@ PJ_DECL(pj_status_t) pjmedia_codec_anmed_vid_deinit(void);
 
 
 /**
- * @}  PJMEDIA_CODEC_VIDEO_TOOLBOX
+ * @}  PJMEDIA_HAS_ANDROID_MEDIACODEC
  */
 
 
 PJ_END_DECL
 
-#endif	/* __PJMEDIA_CODEC_VID_TOOLBOX_H__ */
+#endif	/* __PJMEDIA_CODEC_AND_MEDIACODEC_H__‰ˆˆ‰ */
