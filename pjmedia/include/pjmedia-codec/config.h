@@ -600,6 +600,33 @@
 #endif
 
 /**
+ * Enable Android MediaCodec Opus codec.
+ *
+ * Default: 0
+ */
+#ifndef PJMEDIA_HAS_ANMED_OPUS
+#   define PJMEDIA_HAS_ANMED_OPUS		0
+#endif
+
+/**
+ * Enable Android MediaCodec AMRNB codec.
+ *
+ * Default: 0
+ */
+#ifndef PJMEDIA_HAS_ANMED_AMRNB
+#   define PJMEDIA_HAS_ANMED_AMRNB		0
+#endif
+
+/**
+ * Enable Android MediaCodec AMRWB codec.
+ *
+ * Default: 0
+ */
+#ifndef PJMEDIA_HAS_ANMED_AMRWB
+#   define PJMEDIA_HAS_ANMED_AMRWB		0
+#endif
+
+/**
  * Enable Android MediaCodec AVC/H264 codec.
  *
  * Default: 1

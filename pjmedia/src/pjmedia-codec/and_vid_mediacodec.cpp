@@ -16,7 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <pjmedia-codec/and_mediacodec.h>
+
+#include <pjmedia-codec/and_vid_mediacodec.h>
 #include <pjmedia-codec/h264_packetizer.h>
 #include <pjmedia/vid_codec_util.h>
 #include <pjmedia/errno.h>
@@ -33,9 +34,6 @@
  * Constants
  */
 #define THIS_FILE		"and_vid_mediacodec.cpp"
-#define ANMED_AVC_MIME_TYPE    	"video/avc"
-#define ANMED_VP8_MIME_TYPE    	"video/x-vnd.on2.vp8"
-#define ANMED_VP9_MIME_TYPE    	"video/x-vnd.on2.vp9"
 #define ANMED_KEY_COLOR_FMT     "color-format"
 #define ANMED_KEY_WIDTH         "width"
 #define ANMED_KEY_HEIGHT        "height"
@@ -285,8 +283,8 @@ anmed_codec[] {
     {1, "H264",	"Android MediaCodec AVC/H264 codec", "video/avc",
         "OMX.google.h264.encoder", "OMX.qcom.video.decoder.avc",
         PJMEDIA_RTP_PT_H264, PJMEDIA_FORMAT_H264, KEYFRAME_INTERVAL,
-        open_avc, configure_decoder_avc, process_encode_avc, encode_more_avc,
-        decode_avc,
+        &open_avc, &configure_decoder_avc, &process_encode_avc, 
+        &encode_more_avc, &decode_avc,
         {2, {{{"profile-level-id", 16}, {"42e01e", 6}},
              {{" packetization-mode", 19}, {"1", 1}}}
         }
@@ -296,7 +294,7 @@ anmed_codec[] {
     {1, "VP8",	"Android MediaCodec VP8 codec", "video/x-vnd.on2.vp8",
         "OMX.google.vp8.encoder", "OMX.qcom.video.decoder.vp8",
         PJMEDIA_RTP_PT_VP8, PJMEDIA_FORMAT_VP8, KEYFRAME_INTERVAL,
-        open_vpx, NULL, NULL, encode_more_vpx, decode_vpx,
+        &open_vpx, NULL, NULL, &encode_more_vpx, &decode_vpx,
         {2, {{{"max-fr", 6}, {"30", 2}},
              {{" max-fs", 7}, {"580", 3}}}
         }
@@ -306,7 +304,7 @@ anmed_codec[] {
     {1, "VP9",	"Android MediaCodec VP9 codec", "video/x-vnd.on2.vp9",
         "OMX.google.vp9.encoder", "OMX.qcom.video.decoder.vp9",
         PJMEDIA_RTP_PT_VP9, PJMEDIA_FORMAT_VP9, KEYFRAME_INTERVAL,
-        open_vpx, NULL, NULL, encode_more_vpx, decode_vpx,
+        &open_vpx, NULL, NULL, &encode_more_vpx, &decode_vpx,
         {2, {{{"max-fr", 6}, {"30", 2}},
              {{" max-fs", 7}, {"580", 3}}}
         }
@@ -1084,7 +1082,7 @@ static pj_status_t anmed_codec_encode_begin(pjmedia_vid_codec *codec,
 	if (input_buf && output_size >= input->size) {
 	    pj_memcpy(input_buf, input->buf, input->size);
 	    am_status = AMediaCodec_queueInputBuffer(anmed_data->enc,
-				    buf_idx, 0, input->size, 0, 0);
+				                buf_idx, 0, input->size, 0, 0);
 	    if (am_status != AMEDIA_OK) {
 		PJ_LOG(4, (THIS_FILE, "Encoder queueInputBuffer return %d",
 		           am_status));
