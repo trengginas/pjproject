@@ -1230,8 +1230,9 @@ static pj_status_t anmed_codec_encode_more(pjmedia_vid_codec *codec,
 
     anmed_data = (anmed_codec_data*) codec->codec_data;
 
-    status = anmed_codec[anmed_data->codec_idx].encode_more(out_size, output,
-                                                            has_more);
+    status = anmed_codec[anmed_data->codec_idx].encode_more(anmed_data,
+							    out_size, output,
+							    has_more);
     if (!(*has_more)) {
 	AMediaCodec_releaseOutputBuffer(anmed_data->enc,
 					anmed_data->enc_output_buf_idx,

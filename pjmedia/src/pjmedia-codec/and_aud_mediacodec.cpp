@@ -16,6 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <pjmedia-codec/and_aud_mediacodec.h>
 #include <pjmedia-codec/amr_sdp_match.h>
 #include <pjmedia/codec.h>
 #include <pjmedia/errno.h>
@@ -29,8 +30,6 @@
 #include <pj/pool.h>
 #include <pj/string.h>
 #include <pj/os.h>
-
-
 /*
  * Only build this file if PJMEDIA_HAS_ANDROID_MEDIACODEC != 0
  */
@@ -45,9 +44,9 @@
 #define ANMED_KEY_PCM_ENCODING       "pcm-encoding"
 #define ANMED_KEY_CHANNEL_COUNT      "channel-count"
 #define ANMED_KEY_SAMPLE_RATE        "sample-rate"
-#define ANMED_KEY_BIT_RATE           "bit-rate"
-
-
+#define ANMED_KEY_BITRATE            "bitrate"
+#define ANMED_KEY_MIME               "mime"
+#define ANMED_KEY_ENCODER            "encoder"
 
 /* Prototypes for Android MediaCodec codecs factory */
 static pj_status_t anmed_test_alloc(pjmedia_codec_factory *factory, 
@@ -127,9 +126,9 @@ typedef struct anmed_private {
     int			 codec_idx;	    /**< Codec index.		    */
     void		*codec_setting;	    /**< Specific codec setting.    */
     pj_pool_t		*pool;		    /**< Pool for each instance.    */
-
     AMediaCodec         *enc;               /**< Encoder state.		    */
     AMediaCodec         *dec;               /**< Decoder state.		    */
+
     pj_uint16_t		 frame_size;	    /**< Bitstream frame size.	    */
 
     pj_bool_t		 plc_enabled;	    /**< PLC enabled flag.	    */
@@ -151,33 +150,33 @@ typedef struct anmed_private {
  * of USC frame to bitrate info of codec_data. Implement this callback when 
  * the default behaviour is unapplicable.
  */
-typedef void (*predecode_cb)(anmed_private_t *codec_data,
-			     const pjmedia_frame *rtp_frame,
-			     USC_Bitstream *usc_frame);
+//typedef void (*predecode_cb)(anmed_private_t *codec_data,
+//			     const pjmedia_frame *rtp_frame,
+//			     USC_Bitstream *usc_frame);
 
 /* Parse frames from a packet. Default behaviour of frame parsing is 
  * just separating frames based on calculating frame length derived 
  * from bitrate. Implement this callback when the default behaviour is 
  * unapplicable.
  */
-typedef pj_status_t (*parse_cb)(anmed_private_t *codec_data, void *pkt, 
-				pj_size_t pkt_size, const pj_timestamp *ts,
-				unsigned *frame_cnt, pjmedia_frame frames[]);
+//typedef pj_status_t (*parse_cb)(anmed_private_t *codec_data, void *pkt,
+//				pj_size_t pkt_size, const pj_timestamp *ts,
+//				unsigned *frame_cnt, pjmedia_frame frames[]);
 
 /* Pack frames into a packet. Default behaviour of packing frames is 
  * just stacking the frames with octet aligned without adding any 
  * payload header. Implement this callback when the default behaviour is
  * unapplicable.
  */
-typedef pj_status_t (*pack_cb)(anmed_private_t *codec_data, void *pkt, 
-			       pj_size_t *pkt_size, pj_size_t max_pkt_size);
+//typedef pj_status_t (*pack_cb)(anmed_private_t *codec_data, void *pkt,
+//			       pj_size_t *pkt_size, pj_size_t max_pkt_size);
 
 
 
 /* Custom callback implementations. */
-static void predecode_amr(anmed_private_t *codec_data,
-			  const pjmedia_frame *rtp_frame,
-			  USC_Bitstream *usc_frame);
+//static void predecode_amr(anmed_private_t *codec_data,
+//			  const pjmedia_frame *rtp_frame,
+//			  USC_Bitstream *usc_frame);
 static pj_status_t parse_amr(anmed_private_t *codec_data, void *pkt, 
 			     pj_size_t pkt_size, const pj_timestamp *ts,
 			     unsigned *frame_cnt, pjmedia_frame frames[]);
@@ -191,19 +190,19 @@ static struct anmed_codec {
     const char      *mime_type;         /* Mime type.                       */
     const char      *encoder_name;      /* Encoder name.                    */
     const char      *decoder_name;      /* Decoder name.                    */
+
     pj_uint8_t	     pt;		/* Payload type.		    */
     unsigned	     clock_rate;	/* Codec's clock rate.		    */
     unsigned	     channel_count;	/* Codec's channel count.	    */
     unsigned	     samples_per_frame;	/* Codec's samples count.	    */
-
     unsigned	     def_bitrate;	/* Default bitrate of this codec.   */
     unsigned	     max_bitrate;	/* Maximum bitrate of this codec.   */
     pj_uint8_t	     frm_per_pkt;	/* Default num of frames per packet.*/
     int		     has_native_vad;	/* Codec has internal VAD?	    */
     int		     has_native_plc;	/* Codec has internal PLC?	    */
 
-    predecode_cb     predecode;		/* Callback to translate RTP frame
-					   into USC frame.		    */
+//    predecode_cb     predecode;		/* Callback to translate RTP frame
+//					   into USC frame.		    */
     parse_cb	     parse;		/* Callback to parse bitstream.	    */
     pack_cb	     pack;		/* Callback to pack bitstream.	    */
 
@@ -214,19 +213,21 @@ anmed_codec[] =
 {
 #   if PJMEDIA_HAS_ANMED_AMRNB
     {1, "AMR", "audio/3gpp", "OMX.google.amrnb.encoder",
-        "OMX.google.amrnb.encoder",
+        "OMX.google.amrnb.decoder",
         PJMEDIA_RTP_PT_AMR, 8000, 1, 160, 7400, 12200, 2, 1, 1,
-	&predecode_amr, &parse_amr, &pack_amr,
-        {1, {{{"octet-align", 11}, {"1", 1}}, {{"octet-align", 11}, {"1", 1}}} }
+	//&predecode_amr,
+	&parse_amr, &pack_amr,
+        {1, {{{(char *)"octet-align", 11}, {(char *)"1", 1}}}}
     },
 #   endif
 
 #   if PJMEDIA_HAS_ANMED_AMRWB
-    {1, "AMR-WB", "audio/amr-wb", "OMX.google.amrnb.encoder",
-        "OMX.google.amrnb.encoder",
+    {1, "AMR-WB", "audio/amr-wb", "OMX.google.amrwb.encoder",
+        "OMX.google.amrwb.decoder",
         PJMEDIA_RTP_PT_AMRWB, 16000, 1, 320, 15850, 23850, 2, 1, 1,
-        &predecode_amr, &parse_amr, &pack_amr,
-	{1, {{{"octet-align", 11}, {"1", 1}}} }
+        //&predecode_amr,
+        &parse_amr, &pack_amr,
+	{1, {{{(char *)"octet-align", 11}, {(char *)"1", 1}}}}
     },
 #   endif
 };
@@ -241,55 +242,54 @@ typedef struct amr_settings_t {
     pj_int8_t enc_mode;
 } amr_settings_t;
 
-
 /* Rearrange AMR bitstream and convert RTP frame into USC frame:
  * - make the start_bit to be 0
  * - if it is speech frame, reorder bitstream from sensitivity bits order
  *   to encoder bits order.
  * - set the appropriate value of usc_frame.
  */
-static void predecode_amr( anmed_private_t *codec_data,
-			   const pjmedia_frame *rtp_frame,
-			   USC_Bitstream *usc_frame)
-{
-    pjmedia_frame frame;
-    pjmedia_codec_amr_bit_info *info;
-    pjmedia_codec_amr_pack_setting *setting;
-
-    setting = &((amr_settings_t*)codec_data->codec_setting)->dec_setting;
-
-    frame = *rtp_frame;
-    pjmedia_codec_amr_predecode(rtp_frame, setting, &frame);
-    info = (pjmedia_codec_amr_bit_info*) &frame.bit_info;
-
-    usc_frame->pBuffer = frame.buf;
-    usc_frame->nbytes = frame.size;
-    if (info->mode != -1) {
-	usc_frame->bitrate = setting->amr_nb? 
-			     pjmedia_codec_amrnb_bitrates[info->mode]:
-			     pjmedia_codec_amrwb_bitrates[info->mode];
-    } else {
-	usc_frame->bitrate = 0;
-    }
-
-    if (frame.size > 5) {
-	/* Speech */
-	if (info->good_quality)
-	    usc_frame->frametype = 0;
-	else
-	    usc_frame->frametype = setting->amr_nb ? 5 : 6;
-    } else if (frame.size == 5) {
-	/* SID */
-	if (info->good_quality) {
-	    usc_frame->frametype = info->STI? 2 : 1;
-	} else {
-	    usc_frame->frametype = setting->amr_nb ? 6 : 7;
-	}
-    } else {
-	/* no data */
-	usc_frame->frametype = 3;
-    }
-}
+//static void predecode_amr( anmed_private_t *codec_data,
+//			   const pjmedia_frame *rtp_frame,
+//			   USC_Bitstream *usc_frame)
+//{
+//    pjmedia_frame frame;
+//    pjmedia_codec_amr_bit_info *info;
+//    pjmedia_codec_amr_pack_setting *setting;
+//
+//    setting = &((amr_settings_t*)codec_data->codec_setting)->dec_setting;
+//
+//    frame = *rtp_frame;
+//    pjmedia_codec_amr_predecode(rtp_frame, setting, &frame);
+//    info = (pjmedia_codec_amr_bit_info*) &frame.bit_info;
+//
+//    usc_frame->pBuffer = frame.buf;
+//    usc_frame->nbytes = frame.size;
+//    if (info->mode != -1) {
+//	usc_frame->bitrate = setting->amr_nb?
+//			     pjmedia_codec_amrnb_bitrates[info->mode]:
+//			     pjmedia_codec_amrwb_bitrates[info->mode];
+//    } else {
+//	usc_frame->bitrate = 0;
+//    }
+//
+//    if (frame.size > 5) {
+//	/* Speech */
+//	if (info->good_quality)
+//	    usc_frame->frametype = 0;
+//	else
+//	    usc_frame->frametype = setting->amr_nb ? 5 : 6;
+//    } else if (frame.size == 5) {
+//	/* SID */
+//	if (info->good_quality) {
+//	    usc_frame->frametype = info->STI? 2 : 1;
+//	} else {
+//	    usc_frame->frametype = setting->amr_nb ? 6 : 7;
+//	}
+//    } else {
+//	/* no data */
+//	usc_frame->frametype = 3;
+//    }
+//}
 
 /* Pack AMR payload */
 static pj_status_t pack_amr(anmed_private_t *codec_data, void *pkt, 
@@ -370,93 +370,52 @@ static pj_status_t parse_amr(anmed_private_t *codec_data, void *pkt,
 	struct anmed_codec *anmed_data = &anmed_codec[codec_data->codec_idx];
 
 	s->enc_mode = cmr;
-	codec_data->info->params.modes.bitrate = s->enc_setting.amr_nb?
-				pjmedia_codec_amrnb_bitrates[s->enc_mode] :
-				pjmedia_codec_amrwb_bitrates[s->enc_mode];
-	anmed_data->fxns->std.Control(&codec_data->info->params.modes, 
-				codec_data->enc);
-
-	PJ_LOG(4,(THIS_FILE, "AMR%s switched encoding mode to: %d (%dbps)",
-		  (s->enc_setting.amr_nb?"":"-WB"),
-		  s->enc_mode,
-		  codec_data->info->params.modes.bitrate));
     }
 
-    return PJ_SUCCESS;
-}
-
-static pj_status_t configure_encoder(anmed_private_t *anmed_data) 
-{
-    media_status_t am_status;
-    AMediaFormat *aud_fmt;
-    pjmedia_vid_codec_param *param = anmed_data->prm;
-    int idx = anmed_data->codec_idx;
-
-    aud_fmt = AMediaFormat_new();
-    if (!aud_fmt) {
-        return PJ_ENOMEM;
-    }
-
-    AMediaFormat_setString(aud_fmt, ANMED_KEY_MIME,
-                           anmed_codec[idx].mime_type);
-    //AMediaFormat_setInt32(aud_fmt, ANMED_KEY_PRIORITY, 0);
-    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_PCM_ENCODING, 2);
-    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_SAMPLE_RATE,
-                          anmed_codec[idx].clock_rate);
-
-    /* Configure and start encoder. */
-    am_status = AMediaCodec_configure(anmed_data->enc, aud_fmt, NULL, NULL,
-                                      AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
-    AMediaFormat_delete(aud_fmt);
-    if (am_status != AMEDIA_OK) {
-        PJ_LOG(4, (THIS_FILE, "Encoder configure failed, status=%d",
-        	   am_status));
-        return PJMEDIA_CODEC_EFAILED;
-    }
-    am_status = AMediaCodec_start(anmed_data->enc);
-    if (am_status != AMEDIA_OK) {
-	PJ_LOG(4, (THIS_FILE, "Encoder start failed, status=%d",
-		am_status));
-	return PJMEDIA_CODEC_EFAILED;
-    }
-    return PJ_SUCCESS;
-}
-
-static pj_status_t configure_decoder(anmed_private_t *anmed_data) {
-    media_status_t am_status;
-    AMediaFormat *aud_fmt;
-
-    aud_fmt = AMediaFormat_new();
-    if (!aud_fmt) {
-	PJ_LOG(4, (THIS_FILE, "Decoder failed creating media format"));
-        return PJ_ENOMEM;
-    }
-    AMediaFormat_setString(aud_fmt, ANMED_KEY_MIME,
-                           anmed_codec[anmed_data->codec_idx].mime_type);
-    //AMediaFormat_setInt32(aud_fmt, ANMED_KEY_MAX_INPUT_SZ, 0);
-    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_PCM_ENCODING, 2);
-    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_ENCODER, 0);
-    //AMediaFormat_setInt32(aud_fmt, ANMED_KEY_PRIORITY, 0);
-    am_status = AMediaCodec_configure(anmed_data->dec, aud_fmt, NULL,
-				      NULL, 0);
-
-    AMediaFormat_delete(aud_fmt);
-    if (am_status != AMEDIA_OK) {
-        PJ_LOG(4, (THIS_FILE, "Decoder configure failed, status=%d, fmt_id=%d",
-        	   am_status, anmed_data->prm->dec_fmt.id));
-        return PJMEDIA_CODEC_EFAILED;
-    }
-
-    am_status = AMediaCodec_start(anmed_data->dec);
-    if (am_status != AMEDIA_OK) {
-	PJ_LOG(4, (THIS_FILE, "Decoder start failed, status=%d",
-		   am_status));
-	return PJMEDIA_CODEC_EFAILED;
-    }
     return PJ_SUCCESS;
 }
 
 #endif /* PJMEDIA_HAS_ANMED_AMRNB || PJMEDIA_HAS_ANMED_AMRWB */
+
+static pj_status_t configure_codec(anmed_private_t *anmed_data,
+				   pj_bool_t is_encoder)
+{
+    media_status_t am_status;
+    AMediaFormat *aud_fmt;
+    int idx = anmed_data->codec_idx;
+    AMediaCodec *codec = (is_encoder?anmed_data->enc:anmed_data->dec);
+
+    aud_fmt = AMediaFormat_new();
+    if (!aud_fmt) {
+        return PJ_ENOMEM;
+    }
+    AMediaFormat_setString(aud_fmt, ANMED_KEY_MIME,
+                           anmed_codec[idx].mime_type);
+    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_BITRATE,
+			  anmed_codec[idx].def_bitrate);
+    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_PCM_ENCODING, 2);
+    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_SAMPLE_RATE,
+                          anmed_codec[idx].clock_rate);
+    AMediaFormat_setInt32(aud_fmt, ANMED_KEY_CHANNEL_COUNT,
+                          anmed_codec[idx].channel_count);
+
+    /* Configure and start encoder. */
+    am_status = AMediaCodec_configure(codec, aud_fmt, NULL, NULL, is_encoder);
+    AMediaFormat_delete(aud_fmt);
+    if (am_status != AMEDIA_OK) {
+        PJ_LOG(4, (THIS_FILE, "%s configure failed, status=%d",
+               is_encoder?"Encoder":"Decoder", am_status));
+        return PJMEDIA_CODEC_EFAILED;
+    }
+    am_status = AMediaCodec_start(codec);
+    if (am_status != AMEDIA_OK) {
+	PJ_LOG(4, (THIS_FILE, "%s start failed, status=%d",
+	       is_encoder?"Encoder":"Decoder", am_status));
+	return PJMEDIA_CODEC_EFAILED;
+    }
+    PJ_LOG(4, (THIS_FILE, "%s started", is_encoder?"Encoder":"Decoder"));
+    return PJ_SUCCESS;
+}
 
 /*
  * Initialize and register Android MediaCodec codec factory to pjmedia endpoint.
@@ -471,6 +430,8 @@ PJ_DEF(pj_status_t) pjmedia_codec_anmed_aud_init( pjmedia_endpt *endpt )
 	/* Already initialized. */
 	return PJ_SUCCESS;
     }
+
+    PJ_LOG(4, (THIS_FILE, "Initing codec"));
 
     /* Create Android MediaCodec codec factory. */
     anmed_factory.base.op = &anmed_factory_op;
@@ -498,6 +459,8 @@ PJ_DEF(pj_status_t) pjmedia_codec_anmed_aud_init( pjmedia_endpt *endpt )
     }
 
 #if PJMEDIA_HAS_ANMED_AMRNB
+    PJ_LOG(4, (THIS_FILE, "Registering AMRNB codec"));
+
     pj_cstr(&codec_name, "AMR");
     status = pjmedia_sdp_neg_register_fmt_match_cb(
 					&codec_name,
@@ -507,6 +470,8 @@ PJ_DEF(pj_status_t) pjmedia_codec_anmed_aud_init( pjmedia_endpt *endpt )
 #endif
 
 #if PJMEDIA_HAS_ANMED_AMRWB
+    PJ_LOG(4, (THIS_FILE, "Registering AMRWB codec"));
+
     pj_cstr(&codec_name, "AMR-WB");
     status = pjmedia_sdp_neg_register_fmt_match_cb(
 					&codec_name,
@@ -681,6 +646,28 @@ static pj_status_t anmed_enum_codecs(pjmedia_codec_factory *factory,
     return PJ_SUCCESS;
 }
 
+static void create_codec(anmed_private_t *anmed_data)
+{
+    char const *enc_name = anmed_codec[anmed_data->codec_idx].encoder_name;
+    char const *dec_name = anmed_codec[anmed_data->codec_idx].decoder_name;
+
+    if (!anmed_data->enc) {
+	anmed_data->enc = AMediaCodec_createCodecByName(enc_name);
+	if (!anmed_data->enc) {
+	    PJ_LOG(4, (THIS_FILE, "Failed creating encoder: %s", enc_name));
+	}
+	PJ_LOG(4, (THIS_FILE, "Done creating encoder: %s", enc_name));
+    }
+
+    if (!anmed_data->dec) {
+	anmed_data->dec = AMediaCodec_createCodecByName(dec_name);
+	if (!anmed_data->dec) {
+	    PJ_LOG(4, (THIS_FILE, "Failed creating decoder: %s", dec_name));
+	}
+	PJ_LOG(4, (THIS_FILE, "Done creating decoder: %s", dec_name));
+    }
+}
+
 /*
  * Allocate a new codec instance.
  */
@@ -734,9 +721,7 @@ static pj_status_t anmed_alloc_codec(pjmedia_codec_factory *factory,
 				    anmed_codec[idx].samples_per_frame, 0,
 				    &codec_data->plc);
 	if (status != PJ_SUCCESS) {
-	    pj_pool_release(pool);
-	    pj_mutex_unlock(anmed_factory.mutex);
-	    return status;
+	    goto on_error;
 	}
     }
 
@@ -748,26 +733,33 @@ static pj_status_t anmed_alloc_codec(pjmedia_codec_factory *factory,
 					    anmed_codec[idx].samples_per_frame,
 					    &codec_data->vad);
 	if (status != PJ_SUCCESS) {
-	    pj_pool_release(pool);
-	    pj_mutex_unlock(anmed_factory.mutex);
-	    return status;
+	    goto on_error;
 	}
     }
 
     codec_data->pool = pool;
     codec_data->codec_idx = idx;
 
+    create_codec(codec_data);
+    if (!codec_data->enc || !codec_data->dec) {
+	goto on_error;
+    }
     pj_mutex_unlock(anmed_factory.mutex);
 
     *p_codec = codec;
     return PJ_SUCCESS;
+
+on_error:
+    pj_mutex_unlock(anmed_factory.mutex);
+    anmed_dealloc_codec(factory, codec);
+    return PJMEDIA_CODEC_EFAILED;
 }
 
 /*
  * Free codec.
  */
-static pj_status_t anmed_dealloc_codec( pjmedia_codec_factory *factory, 
-				      pjmedia_codec *codec )
+static pj_status_t anmed_dealloc_codec(pjmedia_codec_factory *factory,
+				       pjmedia_codec *codec )
 {
     anmed_private_t *codec_data;
 
@@ -776,7 +768,7 @@ static pj_status_t anmed_dealloc_codec( pjmedia_codec_factory *factory,
 
     /* Close codec, if it's not closed. */
     codec_data = (anmed_private_t*) codec->codec_data;
-    if (anmed_data->enc) {
+    if (codec_data->enc) {
         AMediaCodec_stop(codec_data->enc);
         AMediaCodec_delete(codec_data->enc);
         codec_data->enc = NULL;
@@ -811,58 +803,41 @@ static pj_status_t anmed_codec_open(pjmedia_codec *codec,
 {
     anmed_private_t *codec_data = (anmed_private_t*) codec->codec_data;
     struct anmed_codec *anmed_data = &anmed_codec[codec_data->codec_idx];
-    int info_size;
-    pj_pool_t *pool;
-    int i, j;
+    pjmedia_codec_amr_pack_setting *setting;
+    unsigned i;
+    pj_status_t status;
+
+    PJ_ASSERT_RETURN(codec && attr, PJ_EINVAL);
+    PJ_ASSERT_RETURN(codec_data != NULL, PJ_EINVALIDOP);
 
     PJ_LOG(5,(THIS_FILE, "Opening codec.."));
 
-    pool = codec_data->pool;
-
-    /* PREPARING THE ENCODER */
-
-
-    /* PREPARING THE DECODER */
-
-    /* Setting the decoder params */
-
-    /* Not sure if VAD affects decoder, just try to be safe */
-    //codec_data->info->params.modes.vad = anmed_data->has_native_vad;
-
-    /* Update codec info */
-    anmed_data->fxns->std.GetInfo((USC_Handle)codec_data->enc, codec_data->info);
-
-    /* Get bitstream size */
-    i = codec_data->info->params.modes.bitrate * anmed_data->samples_per_frame;
-    j = anmed_data->clock_rate << 3;
-    codec_data->frame_size = (pj_uint16_t)(i / j);
-    if (i % j) ++codec_data->frame_size;
-
     codec_data->vad_enabled = (attr->setting.vad != 0);
     codec_data->plc_enabled = (attr->setting.plc != 0);
+    anmed_data->clock_rate = attr->info.clock_rate;
 
 #if PJMEDIA_HAS_ANMED_AMRNB
-    /* Init AMR settings */
-    if (anmed_data->pt == PJMEDIA_RTP_PT_AMR || anmed_data->pt == PJMEDIA_RTP_PT_AMRWB) {
+    if (anmed_data->pt == PJMEDIA_RTP_PT_AMR ||
+	anmed_data->pt == PJMEDIA_RTP_PT_AMRWB)
+    {
 	amr_settings_t *s;
 	pj_uint8_t octet_align = 0;
 	pj_int8_t enc_mode;
 
-	enc_mode = pjmedia_codec_amr_get_mode(
-				codec_data->info->params.modes.bitrate);
+	enc_mode = pjmedia_codec_amr_get_mode(attr->info.avg_bps);
+
 	pj_assert(enc_mode >= 0 && enc_mode <= 8);
 
 	/* Check AMR specific attributes */
-
 	for (i = 0; i < attr->setting.dec_fmtp.cnt; ++i) {
-	    /* octet-align, one of the parameters that must have same value 
+	    /* octet-align, one of the parameters that must have same value
 	     * in offer & answer (RFC 4867 Section 8.3.1). Just check fmtp
-	     * in the decoder side, since it's value is guaranteed to fulfil 
+	     * in the decoder side, since it's value is guaranteed to fulfil
 	     * above requirement (by SDP negotiator).
 	     */
-	    const pj_str_t STR_FMTP_OCTET_ALIGN = {"octet-align", 11};
+	    const pj_str_t STR_FMTP_OCTET_ALIGN = {(char *)"octet-align", 11};
 
-	    if (pj_stricmp(&attr->setting.dec_fmtp.param[i].name, 
+	    if (pj_stricmp(&attr->setting.dec_fmtp.param[i].name,
 			   &STR_FMTP_OCTET_ALIGN) == 0)
 	    {
 		octet_align=(pj_uint8_t)
@@ -870,9 +845,8 @@ static pj_status_t anmed_codec_open(pjmedia_codec *codec,
 		break;
 	    }
 	}
-
 	for (i = 0; i < attr->setting.enc_fmtp.cnt; ++i) {
-	    /* mode-set, encoding mode is chosen based on local default mode 
+	    /* mode-set, encoding mode is chosen based on local default mode
 	     * setting:
 	     * - if local default mode is included in the mode-set, use it
 	     * - otherwise, find the closest mode to local default mode;
@@ -880,9 +854,9 @@ static pj_status_t anmed_codec_open(pjmedia_codec *codec,
 	     *   one, e.g: local default mode is 4, the mode-set param
 	     *   contains '2,3,5,6', then 5 will be chosen.
 	     */
-	    const pj_str_t STR_FMTP_MODE_SET = {"mode-set", 8};
+	    const pj_str_t STR_FMTP_MODE_SET = {(char *)"mode-set", 8};
 
-	    if (pj_stricmp(&attr->setting.enc_fmtp.param[i].name, 
+	    if (pj_stricmp(&attr->setting.enc_fmtp.param[i].name,
 			   &STR_FMTP_MODE_SET) == 0)
 	    {
 		const char *p;
@@ -893,8 +867,10 @@ static pj_status_t anmed_codec_open(pjmedia_codec *codec,
 		l = pj_strlen(&attr->setting.enc_fmtp.param[i].val);
 
 		while (l--) {
-		    if ((anmed_data->pt==PJMEDIA_RTP_PT_AMR && *p>='0' && *p<='7') ||
-		        (anmed_data->pt==PJMEDIA_RTP_PT_AMRWB && *p>='0' && *p<='8'))
+		    if ((anmed_data->pt==PJMEDIA_RTP_PT_AMR &&
+			 *p>='0' && *p<='7') ||
+		        (anmed_data->pt==PJMEDIA_RTP_PT_AMRWB &&
+		         *p>='0' && *p<='8'))
 		    {
 			pj_int8_t tmp = (pj_int8_t)(*p - '0' - enc_mode);
 
@@ -907,7 +883,6 @@ static pj_status_t anmed_codec_open(pjmedia_codec *codec,
 		    }
 		    ++p;
 		}
-
 		if (diff == 99)
 		    goto on_error;
 
@@ -916,37 +891,32 @@ static pj_status_t anmed_codec_open(pjmedia_codec *codec,
 		break;
 	    }
 	}
-
 	/* Initialize AMR specific settings */
-	s = PJ_POOL_ZALLOC_T(pool, amr_settings_t);
+	s = PJ_POOL_ZALLOC_T(codec_data->pool, amr_settings_t);
 	codec_data->codec_setting = s;
 
-	s->enc_setting.amr_nb = (pj_uint8_t)(anmed_data->pt == PJMEDIA_RTP_PT_AMR);
+	s->enc_setting.amr_nb = (pj_uint8_t)
+					(anmed_data->pt == PJMEDIA_RTP_PT_AMR);
 	s->enc_setting.octet_aligned = octet_align;
 	s->enc_setting.reorder = PJ_TRUE;
 	s->enc_setting.cmr = 15;
 
-	s->dec_setting.amr_nb = (pj_uint8_t)(anmed_data->pt == PJMEDIA_RTP_PT_AMR);
+	s->dec_setting.amr_nb = (pj_uint8_t)
+					(anmed_data->pt == PJMEDIA_RTP_PT_AMR);
 	s->dec_setting.octet_aligned = octet_align;
 	s->dec_setting.reorder = PJ_TRUE;
-
 	/* Apply encoder mode/bitrate */
 	s->enc_mode = enc_mode;
-	codec_data->info->params.modes.bitrate = s->enc_setting.amr_nb?
-				pjmedia_codec_amrnb_bitrates[s->enc_mode]:
-				pjmedia_codec_amrwb_bitrates[s->enc_mode];
-	anmed_data->fxns->std.Control(&codec_data->info->params.modes, 
-				codec_data->enc);
-
-	PJ_LOG(4,(THIS_FILE, "AMR%s encoding mode: %d (%dbps)", 
-		  (s->enc_setting.amr_nb?"":"-WB"),
-		  s->enc_mode,
-		  codec_data->info->params.modes.bitrate));
-
-	/* Return back bitrate info to application */
-	attr->info.avg_bps = codec_data->info->params.modes.bitrate;
     }
 #endif
+    status = configure_codec(codec_data, PJ_TRUE);
+    if (status != PJ_SUCCESS) {
+        goto on_error;
+    }
+    status = configure_codec(codec_data, PJ_FALSE);
+    if (status != PJ_SUCCESS) {
+	goto on_error;
+    }
 
     return PJ_SUCCESS;
 
@@ -976,21 +946,13 @@ static pj_status_t  anmed_codec_modify(pjmedia_codec *codec,
     codec_data->vad_enabled = (attr->setting.vad != 0);
     codec_data->plc_enabled = (attr->setting.plc != 0);
 
-    if (anmed_data->has_native_vad) {
-	USC_Modes modes;
-
-	modes = codec_data->info->params.modes;
-	modes.vad = codec_data->vad_enabled;
-	anmed_data->fxns->std.Control(&modes, codec_data->enc);
-    }
-
     return PJ_SUCCESS;
 }
 
 /*
  * Get frames in the packet.
  */
-static pj_status_t  anmed_codec_parse( pjmedia_codec *codec,
+static pj_status_t anmed_codec_parse( pjmedia_codec *codec,
 				     void *pkt,
 				     pj_size_t pkt_size,
 				     const pj_timestamp *ts,
@@ -1004,14 +966,16 @@ static pj_status_t  anmed_codec_parse( pjmedia_codec *codec,
     PJ_ASSERT_RETURN(frame_cnt, PJ_EINVAL);
 
     if (anmed_data->parse != NULL) {
-	return anmed_data->parse(codec_data, pkt,  pkt_size, ts, frame_cnt, frames);
+	return anmed_data->parse(codec_data, pkt,  pkt_size, ts, frame_cnt,
+				 frames);
     }
 
     while (pkt_size >= codec_data->frame_size && count < *frame_cnt) {
 	frames[count].type = PJMEDIA_FRAME_TYPE_AUDIO;
 	frames[count].buf = pkt;
 	frames[count].size = codec_data->frame_size;
-	frames[count].timestamp.u64 = ts->u64 + count*anmed_data->samples_per_frame;
+	frames[count].timestamp.u64 = ts->u64 +
+				      count*anmed_data->samples_per_frame;
 
 	pkt = ((char*)pkt) + codec_data->frame_size;
 	pkt_size -= codec_data->frame_size;
@@ -1023,7 +987,8 @@ static pj_status_t  anmed_codec_parse( pjmedia_codec *codec,
 	frames[count].type = PJMEDIA_FRAME_TYPE_AUDIO;
 	frames[count].buf = pkt;
 	frames[count].size = pkt_size;
-	frames[count].timestamp.u64 = ts->u64 + count*anmed_data->samples_per_frame;
+	frames[count].timestamp.u64 = ts->u64 +
+				      count*anmed_data->samples_per_frame;
 	++count;
     }
 
@@ -1084,101 +1049,69 @@ static pj_status_t anmed_codec_encode( pjmedia_codec *codec,
 
     /* Encode the frames */
     while (nsamples >= samples_per_frame) {
-	USC_PCMStream in;
-	USC_Bitstream out;
-
-	in.bitrate = codec_data->info->params.modes.bitrate;
-	in.nbytes = samples_per_frame << 1;
-	in.pBuffer = (char*)pcm_in;
-	in.pcmType.bitPerSample = codec_data->info->params.pcmType.bitPerSample;
-	in.pcmType.nChannels = codec_data->info->params.pcmType.nChannels;
-	in.pcmType.sample_frequency = codec_data->info->params.pcmType.sample_frequency;
-
-	out.pBuffer = (char*)bits_out;
 
 #if PJMEDIA_HAS_ANMED_AMRNB
 	/* For AMR: reserve two octets for AMR frame info */
-	if (pt == PJMEDIA_RTP_PT_AMR || pt == PJMEDIA_RTP_PT_AMRWB) {
-	    out.pBuffer += 2;
-	}
 #endif
-
-#if PJMEDIA_HAS_INTEL_IPP_CODEC_G722_1
-	/* For G722.1: adjust the encoder input signal level */
-	if (pt >= PJMEDIA_RTP_PT_G722_1_16 && 
-	    pt <= PJMEDIA_RTP_PT_G7221_RSV2 &&
-	    codec_data->g7221_pcm_shift)
-	{
-	    unsigned i;
-	    for (i = 0; i < samples_per_frame; ++i)
-		pcm_in[i] >>= codec_data->g7221_pcm_shift;
-	}
-#endif
-
-	if (USC_NoError != anmed_data->fxns->Encode(codec_data->enc, &in, &out)) {
-	    break;
-	}
 
 #if PJMEDIA_HAS_ANMED_AMRNB
 	/* For AMR: put info (frametype, degraded, last frame, mode) in the 
 	 * first two octets for payload packing.
 	 */
-	if (pt == PJMEDIA_RTP_PT_AMR || pt == PJMEDIA_RTP_PT_AMRWB) {
-	    pj_uint16_t *info = (pj_uint16_t*)bits_out;
-
-	    /* Two octets for AMR frame info, 0=LSB:
-	     * bit 0-3	: frame type
-	     * bit 5	: STI flag
-	     * bit 6	: last frame flag
-	     * bit 7	: quality flag
-	     * bit 8-11	: mode
-	     */
-	    out.nbytes += 2;
-	    if (out.frametype == 0 || out.frametype == 4 || 
-		(pt == PJMEDIA_RTP_PT_AMR && out.frametype == 5) ||
-		(pt == PJMEDIA_RTP_PT_AMRWB && out.frametype == 6))
-	    {
-		/* Speech frame type */
-		*info = (char)pjmedia_codec_amr_get_mode(out.bitrate);
-		/* Quality */
-		if (out.frametype == 5 || out.frametype == 6)
-		    *info |= 0x80;
-	    } else if (out.frametype == 1 || out.frametype == 2 || 
-		       (pt == PJMEDIA_RTP_PT_AMR && out.frametype == 6) ||
-		       (pt == PJMEDIA_RTP_PT_AMRWB && out.frametype == 7))
-	    {
-		/* SID frame type */
-		*info = (pj_uint8_t)(pt == PJMEDIA_RTP_PT_AMRWB? 9 : 8);
-		/* Quality */
-		if (out.frametype == 6 || out.frametype == 7)
-		    *info |= 0x80;
-		/* STI */
-		if (out.frametype != 1)
-		    *info |= 0x20;
-	    } else {
-		/* Untransmited */
-		*info = 15;
-		out.nbytes = 2;
-	    }
-
-	    /* Mode */
-	    *info |= (char)pjmedia_codec_amr_get_mode(out.bitrate) << 8;
-
-	    /* Last frame flag */
-	    if (nsamples == samples_per_frame)
-		*info |= 0x40;
-	}
+//	if (pt == PJMEDIA_RTP_PT_AMR || pt == PJMEDIA_RTP_PT_AMRWB) {
+//	    pj_uint16_t *info = (pj_uint16_t*)bits_out;
+//
+//	    /* Two octets for AMR frame info, 0=LSB:
+//	     * bit 0-3	: frame type
+//	     * bit 5	: STI flag
+//	     * bit 6	: last frame flag
+//	     * bit 7	: quality flag
+//	     * bit 8-11	: mode
+//	     */
+//	    out.nbytes += 2;
+//	    if (out.frametype == 0 || out.frametype == 4 ||
+//		(pt == PJMEDIA_RTP_PT_AMR && out.frametype == 5) ||
+//		(pt == PJMEDIA_RTP_PT_AMRWB && out.frametype == 6))
+//	    {
+//		/* Speech frame type */
+//		*info = (char)pjmedia_codec_amr_get_mode(out.bitrate);
+//		/* Quality */
+//		if (out.frametype == 5 || out.frametype == 6)
+//		    *info |= 0x80;
+//	    } else if (out.frametype == 1 || out.frametype == 2 ||
+//		       (pt == PJMEDIA_RTP_PT_AMR && out.frametype == 6) ||
+//		       (pt == PJMEDIA_RTP_PT_AMRWB && out.frametype == 7))
+//	    {
+//		/* SID frame type */
+//		*info = (pj_uint8_t)(pt == PJMEDIA_RTP_PT_AMRWB? 9 : 8);
+//		/* Quality */
+//		if (out.frametype == 6 || out.frametype == 7)
+//		    *info |= 0x80;
+//		/* STI */
+//		if (out.frametype != 1)
+//		    *info |= 0x20;
+//	    } else {
+//		/* Untransmited */
+//		*info = 15;
+//		out.nbytes = 2;
+//	    }
+//
+//	    /* Mode */
+//	    *info |= (char)pjmedia_codec_amr_get_mode(out.bitrate) << 8;
+//
+//	    /* Last frame flag */
+//	    if (nsamples == samples_per_frame)
+//		*info |= 0x40;
+//	}
 #endif
 
 	pcm_in += samples_per_frame;
 	nsamples -= samples_per_frame;
-	tx += out.nbytes;
-	bits_out += out.nbytes;
     }
 
-    if (anmed_data->pack != NULL) {
-	anmed_data->pack(codec_data, output->buf, &tx, output_buf_len);
-    }
+//    if (anmed_data->pack != NULL) {
+//	anmed_data->pack(codec_data, output->buf, &tx, output_buf_len);
+//    }
 
     /* Check if we don't need to transmit the frame (DTX) */
     if (tx == 0) {
@@ -1207,9 +1140,10 @@ static pj_status_t anmed_codec_decode( pjmedia_codec *codec,
     anmed_private_t *codec_data = (anmed_private_t*) codec->codec_data;
     struct anmed_codec *anmed_data = &anmed_codec[codec_data->codec_idx];
     unsigned samples_per_frame;
-    USC_PCMStream out;
-    USC_Bitstream in;
     pj_uint8_t pt;
+
+    if (1)
+	return PJ_EINVAL;
 
     pt = anmed_data->pt; 
     samples_per_frame = anmed_data->samples_per_frame;
@@ -1217,22 +1151,7 @@ static pj_status_t anmed_codec_decode( pjmedia_codec *codec,
     PJ_ASSERT_RETURN(output_buf_len >= samples_per_frame << 1,
 		     PJMEDIA_CODEC_EPCMTOOSHORT);
 
-    if (input->type == PJMEDIA_FRAME_TYPE_AUDIO) {
-	if (anmed_data->predecode) {
-	    anmed_data->predecode(codec_data, input, &in);
-	} else {
-	    /* Most Android MediaCodec codecs have frametype==0 for speech frame */
-	    in.pBuffer = (char*)input->buf;
-	    in.nbytes = input->size;
-	    in.frametype = 0;
-	    in.bitrate = codec_data->info->params.modes.bitrate;
-	}
-
-	out.pBuffer = output->buf;
-    }
-
-    if (input->type != PJMEDIA_FRAME_TYPE_AUDIO ||
-	USC_NoError != anmed_data->fxns->Decode(codec_data->dec, &in, &out)) 
+    if (input->type != PJMEDIA_FRAME_TYPE_AUDIO)
     {
 	pjmedia_zero_samples((pj_int16_t*)output->buf, samples_per_frame);
 	output->size = samples_per_frame << 1;
@@ -1273,12 +1192,9 @@ static pj_status_t  anmed_codec_recover(pjmedia_codec *codec,
 	if (codec_data->plc) {
 	    pjmedia_plc_generate(codec_data->plc, (pj_int16_t*)output->buf);
 	} else {
-	    USC_PCMStream out;
-	    out.pBuffer = output->buf;
-	    anmed_data->fxns->Decode(codec_data->dec, NULL, &out);
 	}
     } else {
-	pjmedia_zero_samples((pj_int16_t*)output->buf, samples_per_frame);
+	//pjmedia_zero_samples((pj_int16_t*)output->buf, samples_per_frame);
     }
 
     return PJ_SUCCESS;
