@@ -48,6 +48,11 @@
 #define ANMED_KEY_MIME               "mime"
 #define ANMED_KEY_ENCODER            "encoder"
 
+#define CODEC_WAIT_RETRY 	10
+#define CODEC_THREAD_WAIT 	10
+/* Timeout until the buffer is ready in ms. */
+#define CODEC_DEQUEUE_TIMEOUT 	20
+
 /* Prototypes for Android MediaCodec codecs factory */
 static pj_status_t anmed_test_alloc(pjmedia_codec_factory *factory, 
 				    const pjmedia_codec_info *id );
@@ -159,19 +164,17 @@ typedef struct anmed_private {
  * from bitrate. Implement this callback when the default behaviour is 
  * unapplicable.
  */
-//typedef pj_status_t (*parse_cb)(anmed_private_t *codec_data, void *pkt,
-//				pj_size_t pkt_size, const pj_timestamp *ts,
-//				unsigned *frame_cnt, pjmedia_frame frames[]);
+typedef pj_status_t (*parse_cb)(anmed_private_t *codec_data, void *pkt,
+				pj_size_t pkt_size, const pj_timestamp *ts,
+				unsigned *frame_cnt, pjmedia_frame frames[]);
 
 /* Pack frames into a packet. Default behaviour of packing frames is 
  * just stacking the frames with octet aligned without adding any 
  * payload header. Implement this callback when the default behaviour is
  * unapplicable.
  */
-//typedef pj_status_t (*pack_cb)(anmed_private_t *codec_data, void *pkt,
-//			       pj_size_t *pkt_size, pj_size_t max_pkt_size);
-
-
+typedef pj_status_t (*pack_cb)(anmed_private_t *codec_data, void *pkt,
+			       pj_size_t *pkt_size, pj_size_t max_pkt_size);
 
 /* Custom callback implementations. */
 //static void predecode_amr(anmed_private_t *codec_data,
@@ -999,10 +1002,10 @@ static pj_status_t anmed_codec_parse( pjmedia_codec *codec,
 /*
  * Encode frames.
  */
-static pj_status_t anmed_codec_encode( pjmedia_codec *codec, 
-				     const struct pjmedia_frame *input,
-				     unsigned output_buf_len, 
-				     struct pjmedia_frame *output)
+static pj_status_t anmed_codec_encode(pjmedia_codec *codec, 
+				      const struct pjmedia_frame *input,
+				      unsigned output_buf_len, 
+				      struct pjmedia_frame *output)
 {
     anmed_private_t *codec_data = (anmed_private_t*) codec->codec_data;
     struct anmed_codec *anmed_data = &anmed_codec[codec_data->codec_idx];
@@ -1012,6 +1015,7 @@ static pj_status_t anmed_codec_encode( pjmedia_codec *codec,
     pj_int16_t *pcm_in   = (pj_int16_t*)input->buf;
     pj_uint8_t  *bits_out = (pj_uint8_t*) output->buf;
     pj_uint8_t pt;
+    pj_size_t out_size;
 
     /* Invoke external VAD if codec has no internal VAD */
     if (codec_data->vad && codec_data->vad_enabled) {
@@ -1049,69 +1053,86 @@ static pj_status_t anmed_codec_encode( pjmedia_codec *codec,
 
     /* Encode the frames */
     while (nsamples >= samples_per_frame) {
+        pj_ssize_t buf_idx;
+        unsigned i;
+        pj_size_t output_size;
+        pj_uint8_t *output_buf
+        AMediaCodecBufferInfo buf_info;
 
-#if PJMEDIA_HAS_ANMED_AMRNB
-	/* For AMR: reserve two octets for AMR frame info */
-#endif
+        buf_idx = AMediaCodec_dequeueInputBuffer(codec_data->enc,
+					         CODEC_DEQUEUE_TIMEOUT);
+        if (buf_idx >= 0) {
+	    media_status_t am_status;
+	    pj_size_t output_size;
+            unsigned input_size = samples_per_frame << 1;
+	    pj_uint8_t *input_buf = AMediaCodec_getInputBuffer(codec_data->enc,
+						        buf_idx, &output_size);
+	    if (input_buf && output_size >= input->size) {
+	        pj_memcpy(input_buf, pcm_in, input_size);
+	        am_status = AMediaCodec_queueInputBuffer(codec_data->enc,
+				                 buf_idx, 0, input_size, 0, 0);
+	        if (am_status != AMEDIA_OK) {
+		    PJ_LOG(4, (THIS_FILE, "Encoder queueInputBuffer return %d",
+		               am_status));
+		    goto on_return;
+	        }
+	    } else {
+	        if (!input_buf) {
+		    PJ_LOG(4,(THIS_FILE, "Encoder getInputBuffer "
+				         "returns no input buff"));
+	        } else {
+		    PJ_LOG(4,(THIS_FILE, "Encoder getInputBuffer "
+				         "size: %d, expecting %d.",
+				         input_buf, output_size, input_size));
+	        }
+	        goto on_return;
+	    }
+        } else {
+	    PJ_LOG(4,(THIS_FILE, "Encoder dequeueInputBuffer failed[%d]",
+                      buf_idx));
+	    goto on_return;
+        }
 
-#if PJMEDIA_HAS_ANMED_AMRNB
-	/* For AMR: put info (frametype, degraded, last frame, mode) in the 
-	 * first two octets for payload packing.
-	 */
-//	if (pt == PJMEDIA_RTP_PT_AMR || pt == PJMEDIA_RTP_PT_AMRWB) {
-//	    pj_uint16_t *info = (pj_uint16_t*)bits_out;
-//
-//	    /* Two octets for AMR frame info, 0=LSB:
-//	     * bit 0-3	: frame type
-//	     * bit 5	: STI flag
-//	     * bit 6	: last frame flag
-//	     * bit 7	: quality flag
-//	     * bit 8-11	: mode
-//	     */
-//	    out.nbytes += 2;
-//	    if (out.frametype == 0 || out.frametype == 4 ||
-//		(pt == PJMEDIA_RTP_PT_AMR && out.frametype == 5) ||
-//		(pt == PJMEDIA_RTP_PT_AMRWB && out.frametype == 6))
-//	    {
-//		/* Speech frame type */
-//		*info = (char)pjmedia_codec_amr_get_mode(out.bitrate);
-//		/* Quality */
-//		if (out.frametype == 5 || out.frametype == 6)
-//		    *info |= 0x80;
-//	    } else if (out.frametype == 1 || out.frametype == 2 ||
-//		       (pt == PJMEDIA_RTP_PT_AMR && out.frametype == 6) ||
-//		       (pt == PJMEDIA_RTP_PT_AMRWB && out.frametype == 7))
-//	    {
-//		/* SID frame type */
-//		*info = (pj_uint8_t)(pt == PJMEDIA_RTP_PT_AMRWB? 9 : 8);
-//		/* Quality */
-//		if (out.frametype == 6 || out.frametype == 7)
-//		    *info |= 0x80;
-//		/* STI */
-//		if (out.frametype != 1)
-//		    *info |= 0x20;
-//	    } else {
-//		/* Untransmited */
-//		*info = 15;
-//		out.nbytes = 2;
-//	    }
-//
-//	    /* Mode */
-//	    *info |= (char)pjmedia_codec_amr_get_mode(out.bitrate) << 8;
-//
-//	    /* Last frame flag */
-//	    if (nsamples == samples_per_frame)
-//		*info |= 0x40;
-//	}
-#endif
+        for (i = 0; i < CODEC_WAIT_RETRY; ++i) {
+	    buf_idx = AMediaCodec_dequeueOutputBuffer(codec_data->enc,
+						      &buf_info,
+						      CODEC_DEQUEUE_TIMEOUT);
+	    if (buf_idx == -1) {
+	        /* Timeout, wait until output buffer is availble. */
+	        PJ_LOG(5, (THIS_FILE, "Encoder dequeueOutputBuffer timeout[%d]",
+		           i+1));
+	        pj_thread_sleep(CODEC_THREAD_WAIT);
+	    } else {
+	        break;
+	    }
+        }
 
+        if (buf_idx < 0)
+            goto on_return;
+
+        output_buf = AMediaCodec_getOutputBuffer(codec_data->enc,
+                                                 buf_idx,
+                                                 &output_size);
+        if (!output_buf) {
+            PJ_LOG(4, (THIS_FILE, "Encoder failed getting output buffer, "
+                       "buffer size %d, offset %d, flags %d",
+                       buf_info.size, buf_info.offset, buf_info.flags));
+            goto on_return;
+        }
+        pj_memcpy(bits_out, output_buf, buf_info.size);
+
+        AMediaCodec_releaseOutputBuffer(codec_data->enc,
+                                        buf_idx,
+                                        0);
+        bits_out += buf_info.size;
+        output->size += buf_info.size;
 	pcm_in += samples_per_frame;
 	nsamples -= samples_per_frame;
     }
 
-//    if (anmed_data->pack != NULL) {
-//	anmed_data->pack(codec_data, output->buf, &tx, output_buf_len);
-//    }
+    if (anmed_data->pack != NULL) {
+	anmed_data->pack(codec_data, output->buf, &tx, output_buf_len);
+    }
 
     /* Check if we don't need to transmit the frame (DTX) */
     if (tx == 0) {
@@ -1127,6 +1148,12 @@ static pj_status_t anmed_codec_encode( pjmedia_codec *codec,
     output->timestamp = input->timestamp;
 
     return PJ_SUCCESS;
+
+on_return:
+    output->size = 0;
+    output->buf = NULL;
+    output->type = PJMEDIA_FRAME_TYPE_NONE;
+    return PJMEDIA_CODEC_EFAILED;
 }
 
 /*
